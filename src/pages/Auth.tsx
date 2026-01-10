@@ -44,7 +44,7 @@ const Auth = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [user, authLoading, navigate]);
 
@@ -81,7 +81,7 @@ const Auth = () => {
         }
       } else {
         toast.success('Welcome back!');
-        navigate('/');
+        navigate('/dashboard');
       }
     } catch (err) {
       toast.error('An unexpected error occurred');
@@ -125,7 +125,7 @@ const Auth = () => {
         }
       } else {
         toast.success('Account created successfully!');
-        navigate('/');
+        navigate('/dashboard');
       }
     } catch (err) {
       toast.error('An unexpected error occurred');
