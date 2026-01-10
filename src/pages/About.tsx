@@ -297,11 +297,11 @@ const About = () => {
                     </h3>
                   </div>
                   <p className="text-muted-foreground text-sm">
-                    WhatsFlow Technologies Pvt. Ltd.
+                    KeyRun Digital
                     <br />
-                    [Your Business Address]
+                    MSME Registered Digital Agency
                     <br />
-                    Mumbai, Maharashtra - 400001
+                    Hyderabad, Telangana
                     <br />
                     India
                   </p>
@@ -317,13 +317,13 @@ const About = () => {
                     </h3>
                   </div>
                   <p className="text-muted-foreground text-sm">
-                    CIN: U72900MH2020PTC123456
-                    <br />
-                    GSTIN: 27XXXXXXXXXXXZX
+                    MSME Registered
                     <br />
                     Official WhatsApp BSP Partner
                     <br />
-                    ISO 27001 Certified
+                    AI-Powered Automation Experts
+                    <br />
+                    Trusted by 5,000+ Businesses
                   </p>
                 </CardContent>
               </Card>
@@ -368,7 +368,7 @@ const About = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 WhatsFlow. All rights reserved.
+              © 2026 WhatsFlow by KeyRun Digital. All rights reserved.
             </p>
             <div className="flex gap-6">
               <Link

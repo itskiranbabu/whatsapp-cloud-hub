@@ -67,19 +67,19 @@ const Contact = () => {
     {
       icon: Mail,
       title: "Email Us",
-      details: "support@whatsflow.com",
+      details: "support@keyrundigital.com",
       subtext: "We reply within 24 hours",
     },
     {
       icon: Phone,
       title: "Call Us",
-      details: "+91 1800-XXX-XXXX",
-      subtext: "Toll-free, Mon-Sat 9 AM - 6 PM",
+      details: "+91 93474 43043",
+      subtext: "Mon-Sat 9 AM - 6 PM",
     },
     {
       icon: MapPin,
       title: "Visit Us",
-      details: "Mumbai, Maharashtra",
+      details: "Hyderabad, Telangana",
       subtext: "By appointment only",
     },
     {
@@ -390,9 +390,9 @@ const Contact = () => {
                   Office Address
                 </h3>
                 <address className="not-italic text-muted-foreground text-sm space-y-1">
-                  <p>WhatsFlow Technologies Pvt. Ltd.</p>
-                  <p>[Your Business Address]</p>
-                  <p>Mumbai, Maharashtra - 400001</p>
+                  <p>KeyRun Digital</p>
+                  <p>MSME Registered Digital Agency</p>
+                  <p>Hyderabad, Telangana</p>
                   <p>India</p>
                 </address>
               </div>
@@ -429,7 +429,7 @@ const Contact = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 WhatsFlow. All rights reserved.
+              © 2026 WhatsFlow by KeyRun Digital. All rights reserved.
             </p>
             <div className="flex gap-6">
               <Link

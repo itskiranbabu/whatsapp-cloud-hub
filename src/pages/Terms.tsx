@@ -234,9 +234,9 @@ const Terms = () => {
                 For any questions regarding these Terms, please contact us at:
               </p>
               <div className="mt-2 text-muted-foreground">
-                <p>Email: legal@whatsflow.com</p>
-                <p>Phone: +91 1800-XXX-XXXX</p>
-                <p>Address: [Your Business Address], Mumbai, India</p>
+                <p>Email: legal@keyrundigital.com</p>
+                <p>Phone: +91 93474 43043</p>
+                <p>Address: KeyRun Digital, Hyderabad, Telangana, India</p>
               </div>
             </section>
           </div>
@@ -248,7 +248,7 @@ const Terms = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 WhatsFlow. All rights reserved.
+              © 2026 WhatsFlow by KeyRun Digital. All rights reserved.
             </p>
             <div className="flex gap-6">
               <Link
