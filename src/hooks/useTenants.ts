@@ -7,12 +7,15 @@ export interface Tenant {
   name: string;
   slug: string;
   logo_url: string | null;
-  primary_color: string;
+  primary_color: string | null;
   business_name: string | null;
-  is_active: boolean;
-  plan: string;
-  muc_limit: number;
-  created_at: string;
+  is_active: boolean | null;
+  plan: string | null;
+  muc_limit: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  phone_number_id: string | null;
+  waba_id: string | null;
 }
 
 export const useTenants = () => {
