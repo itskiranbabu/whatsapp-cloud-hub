@@ -18,12 +18,14 @@ export interface Tenant {
 export const useTenants = () => {
   const { user, isSuperAdmin } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchTenants = async () => {
     if (!user) {
       setTenants([]);
+      setCurrentTenant(null);
       setIsLoading(false);
       return;
     }
@@ -40,6 +42,10 @@ export const useTenants = () => {
       }
 
       setTenants(data || []);
+      // Set first tenant as current if none selected
+      if (data && data.length > 0 && !currentTenant) {
+        setCurrentTenant(data[0]);
+      }
     } catch (err) {
       console.error('Error fetching tenants:', err);
       setError(err as Error);
@@ -65,11 +71,18 @@ export const useTenants = () => {
     return data;
   };
 
+  const switchTenant = (tenantId: string) => {
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (tenant) setCurrentTenant(tenant);
+  };
+
   return {
     tenants,
+    currentTenant,
     isLoading,
     error,
     refetch: fetchTenants,
     createTenant,
+    switchTenant,
   };
 };

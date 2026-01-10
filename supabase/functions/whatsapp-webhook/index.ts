@@ -49,8 +49,9 @@ interface Dialog360WebhookPayload {
   }>;
 }
 
+// deno-lint-ignore no-explicit-any
 async function handleTwilioWebhook(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   payload: TwilioWebhookPayload,
   isStatusCallback: boolean
 ) {
@@ -106,7 +107,8 @@ async function handleTwilioWebhook(
   }
 }
 
-async function handle360DialogWebhook(supabase: ReturnType<typeof createClient>, payload: Dialog360WebhookPayload) {
+// deno-lint-ignore no-explicit-any
+async function handle360DialogWebhook(supabase: any, payload: Dialog360WebhookPayload) {
   console.log('Processing 360dialog webhook');
 
   for (const entry of payload.entry) {
