@@ -36,6 +36,7 @@ import { HelpTooltip } from "@/components/help/HelpTooltip";
 import { TypingIndicator } from "@/components/inbox/TypingIndicator";
 import { OnlineStatus } from "@/components/inbox/OnlineStatus";
 import { useSimulatedPresence } from "@/hooks/usePresence";
+import { InboxPageHelp } from "@/components/help/PageHelpComponents";
 
 type Conversation = Tables<"conversations">;
 type Message = Tables<"messages">;
@@ -160,7 +161,11 @@ const Inbox = () => {
       title="Inbox"
       subtitle="Manage your customer conversations"
     >
-      <div className="flex h-[calc(100vh-180px)] rounded-xl border border-border bg-card overflow-hidden">
+      {/* Help Button */}
+      <div className="flex justify-end mb-4">
+        <InboxPageHelp />
+      </div>
+      <div className="flex h-[calc(100vh-220px)] rounded-xl border border-border bg-card overflow-hidden">
         {/* Conversation List */}
         <div className="w-96 border-r border-border flex flex-col">
           {/* Search & Filter */}

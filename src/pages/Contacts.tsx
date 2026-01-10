@@ -46,6 +46,7 @@ import {
 import { ContactImportExport } from "@/components/contacts/ContactImportExport";
 import { ContextualHelp } from "@/components/help/ContextualHelp";
 import { HelpTooltip } from "@/components/help/HelpTooltip";
+import { ContactsPageHelp } from "@/components/help/PageHelpComponents";
 import { useContacts } from "@/hooks/useContacts";
 import { useTenants } from "@/hooks/useTenants";
 import { format } from "date-fns";
@@ -127,19 +128,22 @@ const Contacts = () => {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
-        {/* Contextual Help */}
-        <ContextualHelp
-          title="Contact Management Tips"
-          description="Build your contact list to start sending WhatsApp messages. Ensure all contacts have opted in to receive messages."
-          variant="tip"
-          tips={[
-            "Always get explicit consent before adding contacts - WhatsApp requires opt-in",
-            "Use tags to segment your audience for targeted campaigns",
-            "Import contacts via CSV for bulk additions - include phone, name, and email columns",
-            "Contacts without opt-in cannot receive marketing messages",
-          ]}
-          defaultExpanded={false}
-        />
+        {/* Header with Help */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <ContextualHelp
+            title="Contact Management Tips"
+            description="Build your contact list to start sending WhatsApp messages. Ensure all contacts have opted in to receive messages."
+            variant="tip"
+            tips={[
+              "Always get explicit consent before adding contacts - WhatsApp requires opt-in",
+              "Use tags to segment your audience for targeted campaigns",
+              "Import contacts via CSV for bulk additions - include phone, name, and email columns",
+              "Contacts without opt-in cannot receive marketing messages",
+            ]}
+            defaultExpanded={false}
+          />
+          <ContactsPageHelp />
+        </div>
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
