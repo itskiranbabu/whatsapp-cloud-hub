@@ -6,8 +6,11 @@ import { ConversationChart } from "@/components/dashboard/ConversationChart";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { MessageSquare, Users, Send, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 
 const Index = () => {
+  const { data, isLoading } = useDashboardMetrics();
+
   return (
     <DashboardLayout
       title="Dashboard"
@@ -23,31 +26,30 @@ const Index = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Monthly Conversations (MUC)"
-            value="24,586"
-            change={{ value: 12.5, trend: "up" }}
+            value={isLoading ? "—" : (data?.monthlyConversations ?? 0).toLocaleString()}
             icon={MessageSquare}
             variant="primary"
+            description="This month"
           />
           <MetricCard
             title="Active Contacts"
-            value="18,234"
-            change={{ value: 8.2, trend: "up" }}
+            value={isLoading ? "—" : (data?.activeContacts ?? 0).toLocaleString()}
             icon={Users}
             variant="success"
           />
           <MetricCard
             title="Messages Sent"
-            value="156,789"
-            change={{ value: 15.3, trend: "up" }}
+            value={isLoading ? "—" : (data?.messagesSent ?? 0).toLocaleString()}
             icon={Send}
             variant="info"
+            description="Outbound this month"
           />
           <MetricCard
             title="Delivery Rate"
-            value="98.5%"
-            change={{ value: 0.3, trend: "up" }}
+            value={isLoading ? "—" : `${(data?.deliveryRate ?? 0).toFixed(1)}%`}
             icon={CheckCircle}
             variant="success"
+            description="Outbound delivered"
           />
         </div>
 
