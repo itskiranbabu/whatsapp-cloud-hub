@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +20,8 @@ import {
   Send,
   Clock,
   TrendingUp,
+  Menu,
+  X,
 } from "lucide-react";
 
 const Landing = () => {
@@ -141,6 +144,8 @@ const Landing = () => {
     { value: "24/7", label: "Support Available" },
   ];
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -189,20 +194,95 @@ const Landing = () => {
               </Link>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Desktop Auth Buttons */}
+            <div className="hidden sm:flex items-center gap-2 sm:gap-3">
               <Link to="/auth">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="text-sm">
                   Sign In
                 </Button>
               </Link>
               <Link to="/auth">
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-sm whitespace-nowrap">
                   Start Free Trial
                 </Button>
               </Link>
             </div>
+
+            {/* Mobile Menu Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="sm:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="sm:hidden border-t bg-background"
+            >
+              <div className="container mx-auto px-4 py-4 space-y-4">
+                <div className="flex flex-col gap-3">
+                  <a
+                    href="#features"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Features
+                  </a>
+                  <a
+                    href="#pricing"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Pricing
+                  </a>
+                  <a
+                    href="#testimonials"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Testimonials
+                  </a>
+                  <Link
+                    to="/about"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    About
+                  </Link>
+                  <Link
+                    to="/contact"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Contact
+                  </Link>
+                </div>
+                <div className="flex flex-col gap-2 pt-4 border-t">
+                  <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="outline" className="w-full">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
+                    <Button className="w-full bg-primary hover:bg-primary/90">
+                      Start Free Trial
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* Hero Section */}
