@@ -5,6 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Plus,
   Search,
@@ -31,75 +48,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const templates = [
-  {
-    id: 1,
-    name: "Welcome Message",
-    category: "utility",
-    status: "approved",
-    language: "English",
-    lastEdited: "Jan 8, 2026",
-    type: "text",
-    preview: "Hi {{1}}! 👋 Welcome to our store. We're excited to have you here!",
-    usageCount: 15420,
-  },
-  {
-    id: 2,
-    name: "Order Confirmation",
-    category: "utility",
-    status: "approved",
-    language: "English",
-    lastEdited: "Jan 7, 2026",
-    type: "text",
-    preview: "Your order #{{1}} has been confirmed! ✅ Expected delivery: {{2}}",
-    usageCount: 8750,
-  },
-  {
-    id: 3,
-    name: "Flash Sale Promo",
-    category: "marketing",
-    status: "approved",
-    language: "English",
-    lastEdited: "Jan 6, 2026",
-    type: "image",
-    preview: "🔥 FLASH SALE! Get up to {{1}}% off on selected items. Shop now!",
-    usageCount: 25600,
-  },
-  {
-    id: 4,
-    name: "Cart Reminder",
-    category: "marketing",
-    status: "pending",
-    language: "English",
-    lastEdited: "Jan 9, 2026",
-    type: "text",
-    preview: "Hey {{1}}, you left items in your cart! Complete your purchase now.",
-    usageCount: 0,
-  },
-  {
-    id: 5,
-    name: "OTP Verification",
-    category: "authentication",
-    status: "approved",
-    language: "English",
-    lastEdited: "Jan 5, 2026",
-    type: "text",
-    preview: "Your verification code is {{1}}. Valid for 10 minutes.",
-    usageCount: 45200,
-  },
-  {
-    id: 6,
-    name: "Feedback Request",
-    category: "utility",
-    status: "rejected",
-    language: "English",
-    lastEdited: "Jan 4, 2026",
-    type: "text",
-    preview: "Hi {{1}}, how was your experience? We'd love to hear from you!",
-    usageCount: 0,
-  },
-];
+import { useTemplates, Template } from "@/hooks/useTemplates";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
 const categoryConfig = {
   marketing: {
@@ -116,11 +67,6 @@ const categoryConfig = {
     icon: UserCheck,
     label: "Authentication",
     color: "text-green-600 bg-green-100 dark:bg-green-900/30",
-  },
-  service: {
-    icon: MessageSquare,
-    label: "Service",
-    color: "text-amber-600 bg-amber-100 dark:bg-amber-900/30",
   },
 };
 
@@ -142,22 +88,74 @@ const statusConfig = {
   },
 };
 
-const typeIcons = {
-  text: FileText,
-  image: Image,
-  video: Video,
-  link: Link2,
-};
-
 const Templates = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({
+    name: "",
+    body: "",
+    category: "utility" as "marketing" | "utility" | "authentication",
+    language: "en",
+  });
+
+  const { templates, isLoading, createTemplate, deleteTemplate } = useTemplates();
 
   const filteredTemplates = templates.filter((template) => {
     const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === "all" || template.category === activeTab;
     return matchesSearch && matchesTab;
   });
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplate.name.trim() || !newTemplate.body.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    try {
+      await createTemplate.mutateAsync({
+        name: newTemplate.name,
+        body: newTemplate.body,
+        category: newTemplate.category,
+        language: newTemplate.language,
+        status: "pending",
+      });
+      toast.success("Template created and submitted for approval");
+      setShowCreateDialog(false);
+      setNewTemplate({ name: "", body: "", category: "utility", language: "en" });
+    } catch (error) {
+      toast.error("Failed to create template");
+      console.error(error);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    try {
+      await deleteTemplate.mutateAsync(id);
+      toast.success("Template deleted");
+    } catch (error) {
+      toast.error("Failed to delete template");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Templates" subtitle="Create and manage your message templates">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <Skeleton className="h-10 w-full max-w-md" />
+            <Skeleton className="h-10 w-40" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-48" />
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
@@ -186,7 +184,7 @@ const Templates = () => {
               Filter
             </Button>
           </div>
-          <Button className="btn-whatsapp gap-2">
+          <Button className="btn-whatsapp gap-2" onClick={() => setShowCreateDialog(true)}>
             <Plus className="w-4 h-4" />
             Create Template
           </Button>
@@ -202,95 +200,176 @@ const Templates = () => {
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredTemplates.map((template, index) => {
-                const category = categoryConfig[template.category as keyof typeof categoryConfig];
-                const status = statusConfig[template.status as keyof typeof statusConfig];
-                const TypeIcon = typeIcons[template.type as keyof typeof typeIcons];
+            {filteredTemplates.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">No templates found</p>
+                <Button
+                  variant="link"
+                  className="mt-2"
+                  onClick={() => setShowCreateDialog(true)}
+                >
+                  Create your first template
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTemplates.map((template, index) => {
+                  const category = categoryConfig[template.category as keyof typeof categoryConfig];
+                  const status = statusConfig[template.status as keyof typeof statusConfig] || statusConfig.pending;
 
-                return (
-                  <motion.div
-                    key={template.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Card className="group hover:shadow-md transition-all duration-200 cursor-pointer hover:border-primary/30">
-                      <CardContent className="p-5">
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${category.color}`}>
-                              <category.icon className="w-4 h-4" />
+                  return (
+                    <motion.div
+                      key={template.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="group hover:shadow-md transition-all duration-200 cursor-pointer hover:border-primary/30">
+                        <CardContent className="p-5">
+                          {/* Header */}
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${category.color}`}>
+                                <category.icon className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-foreground">
+                                  {template.name}
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
+                                  {template.language || "en"} •{" "}
+                                  {template.updated_at
+                                    ? format(new Date(template.updated_at), "MMM d, yyyy")
+                                    : ""}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <h3 className="font-semibold text-foreground">
-                                {template.name}
-                              </h3>
-                              <p className="text-xs text-muted-foreground">
-                                {template.language} • {template.lastEdited}
-                              </p>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>
+                                  <Edit2 className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Copy className="w-4 h-4 mr-2" />
+                                  Duplicate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => handleDeleteTemplate(template.id)}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <Edit2 className="w-4 h-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Copy className="w-4 h-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
 
-                        {/* Preview */}
-                        <div className="p-3 rounded-lg bg-muted/50 mb-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <TypeIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground capitalize">
-                              {template.type} message
+                          {/* Preview */}
+                          <div className="p-3 rounded-lg bg-muted/50 mb-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                Text message
+                              </span>
+                            </div>
+                            <p className="text-sm text-foreground line-clamp-2">
+                              {template.body}
+                            </p>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="flex items-center justify-between">
+                            <span className={status.className}>
+                              <status.icon className="w-3 h-3" />
+                              {status.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {category.label}
                             </span>
                           </div>
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {template.preview}
-                          </p>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between">
-                          <span className={status.className}>
-                            <status.icon className="w-3 h-3" />
-                            {status.label}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {template.usageCount.toLocaleString()} uses
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </motion.div>
+
+      {/* Create Template Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create New Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Template Name</Label>
+              <Input
+                id="name"
+                placeholder="e.g., order_confirmation"
+                value={newTemplate.name}
+                onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use lowercase letters, numbers, and underscores only
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Select
+                value={newTemplate.category}
+                onValueChange={(value: "marketing" | "utility" | "authentication") =>
+                  setNewTemplate({ ...newTemplate, category: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="utility">Utility</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="authentication">Authentication</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="body">Message Body</Label>
+              <Textarea
+                id="body"
+                placeholder="Hello {{1}}, your order #{{2}} is confirmed!"
+                value={newTemplate.body}
+                onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
+                className="min-h-[120px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use {"{{1}}"}, {"{{2}}"}, etc. for dynamic variables
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTemplate} disabled={createTemplate.isPending}>
+              {createTemplate.isPending ? "Creating..." : "Submit for Approval"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
