@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.whatsapp-broadcast]
 verify_jwt = false
 
+[functions.whatsapp-aisensy]
+verify_jwt = false
+
 [functions.ai-assistant]
 enabled = true
 verify_jwt = false
