@@ -8,12 +8,38 @@ import { APIStatusCard } from "@/components/dashboard/APIStatusCard";
 import { OnboardingProgress } from "@/components/dashboard/OnboardingProgress";
 import { BusinessProfileCard } from "@/components/dashboard/BusinessProfileCard";
 import { CreditsCard } from "@/components/dashboard/CreditsCard";
+import { GettingStartedGuide } from "@/components/help/GettingStartedGuide";
 import { MessageSquare, Users, Send, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
+import { useTenants } from "@/hooks/useTenants";
+import { useContacts } from "@/hooks/useContacts";
+import { useTemplates } from "@/hooks/useTemplates";
 
 const Index = () => {
   const { data, isLoading } = useDashboardMetrics();
+  const { tenants } = useTenants();
+  const { contacts } = useContacts();
+  const { templates } = useTemplates();
+
+  // Determine completed prerequisites based on data
+  const hasWhatsAppConnected = tenants.some(t => t.waba_id || t.phone_number_id);
+  const hasContacts = contacts.length > 0;
+  const hasTemplates = templates.length > 0;
+
+  const completedPrereqs = [
+    ...(hasWhatsAppConnected ? ["meta-business", "phone-number", "business-verification"] : []),
+    "payment-method", // Assume this is done if they're using the app
+  ];
+
+  const completedSteps = [
+    ...(hasWhatsAppConnected ? ["connect-api"] : []),
+    ...(hasContacts ? ["import-contacts"] : []),
+    ...(hasTemplates ? ["create-template"] : []),
+  ];
+
+  // Show getting started guide if not fully set up
+  const showGettingStarted = completedSteps.length < 3;
 
   return (
     <DashboardLayout
@@ -28,6 +54,14 @@ const Index = () => {
       >
         {/* API Status Bar */}
         <APIStatusCard />
+
+        {/* Getting Started Guide for new users */}
+        {showGettingStarted && (
+          <GettingStartedGuide
+            completedPrerequisites={completedPrereqs}
+            completedSteps={completedSteps}
+          />
+        )}
 
         {/* Onboarding Progress */}
         <OnboardingProgress />

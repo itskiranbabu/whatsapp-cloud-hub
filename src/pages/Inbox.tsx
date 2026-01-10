@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Check,
   Sparkles,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import { SmartReplyPanel } from "@/components/inbox/SmartReplyPanel";
+import { HelpTooltip } from "@/components/help/HelpTooltip";
 
 type Conversation = Tables<"conversations">;
 type Message = Tables<"messages">;

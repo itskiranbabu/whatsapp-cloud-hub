@@ -69,6 +69,8 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useContacts } from "@/hooks/useContacts";
 import { WhatsAppPhonePreview } from "@/components/whatsapp/WhatsAppPhonePreview";
+import { ContextualHelp } from "@/components/help/ContextualHelp";
+import { HelpTooltip } from "@/components/help/HelpTooltip";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -488,6 +490,20 @@ const Campaigns = () => {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
+        {/* Contextual Help */}
+        <ContextualHelp
+          title="Campaign Best Practices"
+          description="Campaigns let you send messages to multiple contacts at once using approved templates."
+          variant="guide"
+          tips={[
+            "Only approved templates can be used in campaigns - create and get templates approved first",
+            "Schedule campaigns during business hours for better engagement",
+            "Use segments to target specific audience groups with relevant messages",
+            "Monitor delivery and read rates to optimize future campaigns",
+          ]}
+          defaultExpanded={false}
+        />
+
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="metric-card-primary">

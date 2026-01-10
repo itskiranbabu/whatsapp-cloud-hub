@@ -127,6 +127,14 @@ const App: React.FC = () => {
                 }
               />
               <Route
+                path="/help"
+                element={
+                  <ProtectedRoute>
+                    <HelpCenter />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/integrations"
                 element={
                   <ProtectedRoute>
@@ -144,6 +152,7 @@ const App: React.FC = () => {
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <AIAssistant />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
