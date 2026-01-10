@@ -72,6 +72,7 @@ export const useTenants = () => {
   return {
     tenants,
     currentTenant,
+    currentTenantId,
     isLoading,
     error,
     refetch: fetchTenants,

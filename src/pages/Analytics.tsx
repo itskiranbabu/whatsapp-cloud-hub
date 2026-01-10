@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AreaChart,
   Area,
@@ -23,40 +25,35 @@ import {
   Calendar,
   TrendingUp,
   MessageSquare,
-  Users,
   CheckCircle,
   Eye,
   Reply,
 } from "lucide-react";
-
-const conversationData = [
-  { name: "Jan 1", conversations: 2400, messages: 8900 },
-  { name: "Jan 2", conversations: 1398, messages: 6200 },
-  { name: "Jan 3", conversations: 3800, messages: 12800 },
-  { name: "Jan 4", conversations: 3908, messages: 14200 },
-  { name: "Jan 5", conversations: 4800, messages: 16900 },
-  { name: "Jan 6", conversations: 3800, messages: 11500 },
-  { name: "Jan 7", conversations: 4300, messages: 15800 },
-];
-
-const messageTypeData = [
-  { name: "Marketing", value: 35, color: "hsl(142 70% 45%)" },
-  { name: "Utility", value: 40, color: "hsl(199 89% 48%)" },
-  { name: "Authentication", value: 15, color: "hsl(38 92% 50%)" },
-  { name: "Service", value: 10, color: "hsl(280 65% 60%)" },
-];
-
-const deliveryData = [
-  { name: "Mon", sent: 4200, delivered: 4150, read: 3200 },
-  { name: "Tue", sent: 3800, delivered: 3750, read: 2900 },
-  { name: "Wed", sent: 5100, delivered: 5050, read: 4100 },
-  { name: "Thu", sent: 4600, delivered: 4550, read: 3500 },
-  { name: "Fri", sent: 3900, delivered: 3850, read: 3000 },
-  { name: "Sat", sent: 2800, delivered: 2750, read: 2100 },
-  { name: "Sun", sent: 2200, delivered: 2150, read: 1700 },
-];
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const Analytics = () => {
+  const [period, setPeriod] = useState(7);
+  const { analytics, isLoading } = useAnalytics(period);
+
+  if (isLoading || !analytics) {
+    return (
+      <DashboardLayout title="Analytics" subtitle="Track your messaging performance and insights">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-28" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Skeleton className="h-80 col-span-2" />
+            <Skeleton className="h-80" />
+          </div>
+          <Skeleton className="h-80" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       title="Analytics"
@@ -74,10 +71,9 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Conversations</p>
-                  <p className="text-2xl font-bold">24,586</p>
-                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    +12.5% from last month
+                  <p className="text-2xl font-bold">{analytics.totalConversations.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last {period} days
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/10">
@@ -91,10 +87,10 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Delivery Rate</p>
-                  <p className="text-2xl font-bold">98.5%</p>
+                  <p className="text-2xl font-bold">{analytics.deliveryRate}%</p>
                   <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                     <TrendingUp className="w-3 h-3" />
-                    +0.3% from last month
+                    Messages delivered
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-green-500/10">
@@ -108,10 +104,10 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Read Rate</p>
-                  <p className="text-2xl font-bold">76.2%</p>
-                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    +5.8% from last month
+                  <p className="text-2xl font-bold">{analytics.readRate}%</p>
+                  <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                    <Eye className="w-3 h-3" />
+                    Messages read
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-blue-500/10">
@@ -125,10 +121,10 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Reply Rate</p>
-                  <p className="text-2xl font-bold">23.4%</p>
-                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    +2.1% from last month
+                  <p className="text-2xl font-bold">{analytics.replyRate}%</p>
+                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                    <Reply className="w-3 h-3" />
+                    Inbound messages
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-amber-500/10">
@@ -141,12 +137,12 @@ const Analytics = () => {
 
         {/* Action Bar */}
         <div className="flex items-center justify-between">
-          <Tabs defaultValue="7d" className="w-auto">
+          <Tabs value={String(period)} onValueChange={(v) => setPeriod(Number(v))} className="w-auto">
             <TabsList>
-              <TabsTrigger value="24h">24 Hours</TabsTrigger>
-              <TabsTrigger value="7d">7 Days</TabsTrigger>
-              <TabsTrigger value="30d">30 Days</TabsTrigger>
-              <TabsTrigger value="90d">90 Days</TabsTrigger>
+              <TabsTrigger value="1">24 Hours</TabsTrigger>
+              <TabsTrigger value="7">7 Days</TabsTrigger>
+              <TabsTrigger value="30">30 Days</TabsTrigger>
+              <TabsTrigger value="90">90 Days</TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="flex items-center gap-2">
@@ -173,41 +169,47 @@ const Analytics = () => {
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={conversationData}>
-                    <defs>
-                      <linearGradient id="colorConv" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(142 70% 45%)" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(142 70% 45%)" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="colorMsg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(199 89% 48%)" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(199 89% 48%)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 13% 91%)" vertical={false} />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Legend />
-                    <Area
-                      type="monotone"
-                      dataKey="conversations"
-                      stroke="hsl(142 70% 45%)"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorConv)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="messages"
-                      stroke="hsl(199 89% 48%)"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorMsg)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {analytics.trendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={analytics.trendData}>
+                      <defs>
+                        <linearGradient id="colorConv" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(142 70% 45%)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(142 70% 45%)" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="colorMsg" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(199 89% 48%)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(199 89% 48%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 13% 91%)" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey="conversations"
+                        stroke="hsl(142 70% 45%)"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorConv)"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="messages"
+                        stroke="hsl(199 89% 48%)"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorMsg)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    No data available for this period
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -217,30 +219,36 @@ const Analytics = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
-                Message Types
+                Template Categories
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={messageTypeData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {messageTypeData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                {analytics.messageTypeData.some(d => d.value > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analytics.messageTypeData.filter(d => d.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {analytics.messageTypeData.filter(d => d.value > 0).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    No templates created yet
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -251,23 +259,29 @@ const Analytics = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-primary" />
-              Delivery Performance
+              Delivery Performance (Last 7 Days)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deliveryData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 13% 91%)" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="sent" fill="hsl(220 9% 46%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="delivered" fill="hsl(142 70% 45%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="read" fill="hsl(199 89% 48%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {analytics.deliveryData.some(d => d.sent > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.deliveryData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 13% 91%)" vertical={false} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="sent" fill="hsl(220 9% 46%)" radius={[4, 4, 0, 0]} name="Sent" />
+                    <Bar dataKey="delivered" fill="hsl(142 70% 45%)" radius={[4, 4, 0, 0]} name="Delivered" />
+                    <Bar dataKey="read" fill="hsl(199 89% 48%)" radius={[4, 4, 0, 0]} name="Read" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No delivery data available
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
