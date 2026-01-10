@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,116 +17,127 @@ import {
   Star,
   Archive,
   CheckCheck,
-  Clock
+  Clock,
+  Loader2,
+  MessageSquare,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useConversations, useMessages } from "@/hooks/useConversations";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import type { Tables } from "@/integrations/supabase/types";
 
-const conversations = [
-  {
-    id: 1,
-    name: "Sarah Johnson",
-    phone: "+1 555-0123",
-    lastMessage: "Thanks for the quick response! I'll place my order now.",
-    time: "2m ago",
-    unread: 2,
-    avatar: "Sarah",
-    status: "active",
-    starred: true,
-  },
-  {
-    id: 2,
-    name: "Michael Chen",
-    phone: "+1 555-0456",
-    lastMessage: "When will my order be delivered?",
-    time: "15m ago",
-    unread: 1,
-    avatar: "Michael",
-    status: "waiting",
-    starred: false,
-  },
-  {
-    id: 3,
-    name: "Emma Williams",
-    phone: "+1 555-0789",
-    lastMessage: "I'd like to know more about the premium plan.",
-    time: "1h ago",
-    unread: 0,
-    avatar: "Emma",
-    status: "resolved",
-    starred: false,
-  },
-  {
-    id: 4,
-    name: "David Kumar",
-    phone: "+1 555-0321",
-    lastMessage: "Can you help me reset my password?",
-    time: "2h ago",
-    unread: 0,
-    avatar: "David",
-    status: "resolved",
-    starred: true,
-  },
-  {
-    id: 5,
-    name: "Lisa Anderson",
-    phone: "+1 555-0654",
-    lastMessage: "Do you have this product in blue?",
-    time: "3h ago",
-    unread: 0,
-    avatar: "Lisa",
-    status: "waiting",
-    starred: false,
-  },
-];
+type Conversation = Tables<"conversations">;
+type Message = Tables<"messages">;
+type Contact = Tables<"contacts">;
 
-const messages = [
-  {
-    id: 1,
-    type: "inbound",
-    text: "Hi! I'm interested in your premium plan. Can you tell me more about it?",
-    time: "10:23 AM",
-    status: "read",
-  },
-  {
-    id: 2,
-    type: "outbound",
-    text: "Hello Sarah! Thank you for your interest in our Premium Plan. 🎉\n\nOur Premium Plan includes:\n✅ Unlimited conversations\n✅ Priority support\n✅ Advanced automation\n✅ Custom integrations\n\nWould you like me to set up a demo?",
-    time: "10:25 AM",
-    status: "read",
-  },
-  {
-    id: 3,
-    type: "inbound",
-    text: "That sounds great! Yes, I'd love a demo. When are you available?",
-    time: "10:30 AM",
-    status: "read",
-  },
-  {
-    id: 4,
-    type: "outbound",
-    text: "Perfect! I have slots available tomorrow at 2 PM or 4 PM EST. Which works better for you?",
-    time: "10:32 AM",
-    status: "read",
-  },
-  {
-    id: 5,
-    type: "inbound",
-    text: "2 PM works for me! Thanks for the quick response! I'll place my order now.",
-    time: "10:35 AM",
-    status: "read",
-  },
-];
+interface ConversationWithContact extends Conversation {
+  contact: Contact;
+}
 
-const statusColors = {
-  active: "bg-green-500",
-  waiting: "bg-amber-500",
+const statusColors: Record<string, string> = {
+  open: "bg-green-500",
+  pending: "bg-amber-500",
   resolved: "bg-gray-400",
+  expired: "bg-red-400",
 };
 
 const Inbox = () => {
-  const [selectedConversation, setSelectedConversation] = useState(conversations[0]);
+  const { conversations, isLoading: conversationsLoading } = useConversations();
+  const [selectedConversation, setSelectedConversation] = useState<ConversationWithContact | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "unread" | "starred">("all");
+  const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const { messages, isLoading: messagesLoading, sendMessage } = useMessages(
+    selectedConversation?.id || null
+  );
+
+  // Auto-select first conversation
+  useEffect(() => {
+    if (conversations.length > 0 && !selectedConversation) {
+      setSelectedConversation(conversations[0] as ConversationWithContact);
+    }
+  }, [conversations, selectedConversation]);
+
+  // Subscribe to real-time message updates
+  useEffect(() => {
+    if (!selectedConversation?.id) return;
+
+    const channel = supabase
+      .channel(`messages-${selectedConversation.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${selectedConversation.id}`,
+        },
+        (payload) => {
+          console.log("New message received:", payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversation?.id]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedConversation) return;
+
+    try {
+      await sendMessage.mutateAsync({
+        conversationId: selectedConversation.id,
+        contactId: selectedConversation.contact_id,
+        content: messageText.trim(),
+      });
+      setMessageText("");
+    } catch (error) {
+      toast({
+        title: "Failed to send message",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const filteredConversations = conversations.filter((conv) => {
+    const c = conv as ConversationWithContact;
+    const matchesSearch =
+      c.contact?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.contact?.phone?.includes(searchQuery);
+    
+    if (filter === "unread") return matchesSearch && (c.unread_count || 0) > 0;
+    return matchesSearch;
+  });
+
+  const getMessageStatus = (message: Message) => {
+    if (message.status === "read") return <CheckCheck className="w-3.5 h-3.5 text-blue-500" />;
+    if (message.status === "delivered") return <CheckCheck className="w-3.5 h-3.5" />;
+    if (message.status === "sent") return <Check className="w-3.5 h-3.5" />;
+    if (message.status === "failed") return <span className="text-xs text-destructive">Failed</span>;
+    return <Clock className="w-3.5 h-3.5" />;
+  };
 
   return (
     <DashboardLayout
@@ -142,243 +153,319 @@ const Inbox = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-muted/50"
               />
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button 
+                variant={filter === "all" ? "default" : "outline"} 
+                size="sm" 
+                className="gap-1.5"
+                onClick={() => setFilter("all")}
+              >
                 <Filter className="w-3.5 h-3.5" />
                 All
               </Button>
-              <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                Unread (3)
-              </Badge>
-              <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                Starred
+              <Badge 
+                variant={filter === "unread" ? "default" : "secondary"} 
+                className="cursor-pointer hover:bg-secondary/80"
+                onClick={() => setFilter("unread")}
+              >
+                Unread ({conversations.filter((c) => (c.unread_count || 0) > 0).length})
               </Badge>
             </div>
           </div>
 
           {/* Conversation List */}
           <ScrollArea className="flex-1">
-            {conversations.map((conversation) => (
-              <motion.div
-                key={conversation.id}
-                onClick={() => setSelectedConversation(conversation)}
-                className={cn(
-                  "flex items-center gap-3 p-4 cursor-pointer transition-colors border-b border-border/50",
-                  selectedConversation?.id === conversation.id
-                    ? "bg-primary/5 border-l-4 border-l-primary"
-                    : "hover:bg-muted/50"
-                )}
-                whileHover={{ x: 2 }}
-              >
-                <div className="relative">
-                  <Avatar className="w-11 h-11">
-                    <AvatarImage
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.avatar}`}
-                    />
-                    <AvatarFallback>{conversation.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <span
-                    className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${statusColors[conversation.status as keyof typeof statusColors]}`}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <p className="font-medium text-foreground truncate">
-                        {conversation.name}
-                      </p>
-                      {conversation.starred && (
-                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      )}
+            {conversationsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <MessageSquare className="w-12 h-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No conversations yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Messages will appear here when customers contact you
+                </p>
+              </div>
+            ) : (
+              filteredConversations.map((conversation) => {
+                const conv = conversation as ConversationWithContact;
+                return (
+                  <motion.div
+                    key={conv.id}
+                    onClick={() => setSelectedConversation(conv)}
+                    className={cn(
+                      "flex items-center gap-3 p-4 cursor-pointer transition-colors border-b border-border/50",
+                      selectedConversation?.id === conv.id
+                        ? "bg-primary/5 border-l-4 border-l-primary"
+                        : "hover:bg-muted/50"
+                    )}
+                    whileHover={{ x: 2 }}
+                  >
+                    <div className="relative">
+                      <Avatar className="w-11 h-11">
+                        <AvatarImage
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${conv.contact?.name || conv.contact?.phone}`}
+                        />
+                        <AvatarFallback>
+                          {conv.contact?.name?.[0] || conv.contact?.phone?.[0] || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span
+                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${statusColors[conv.status || "open"]}`}
+                      />
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {conversation.time}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground truncate mt-0.5">
-                    {conversation.lastMessage}
-                  </p>
-                </div>
-                {conversation.unread > 0 && (
-                  <Badge className="bg-primary text-primary-foreground h-5 min-w-5 justify-center">
-                    {conversation.unread}
-                  </Badge>
-                )}
-              </motion.div>
-            ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-foreground truncate">
+                          {conv.contact?.name || conv.contact?.phone || "Unknown"}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          {conv.last_message_at
+                            ? format(new Date(conv.last_message_at), "h:mm a")
+                            : ""}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate mt-0.5">
+                        {conv.contact?.phone}
+                      </p>
+                    </div>
+                    {(conv.unread_count || 0) > 0 && (
+                      <Badge className="bg-primary text-primary-foreground h-5 min-w-5 justify-center">
+                        {conv.unread_count}
+                      </Badge>
+                    )}
+                  </motion.div>
+                );
+              })
+            )}
           </ScrollArea>
         </div>
 
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
-          {/* Chat Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <Avatar className="w-10 h-10">
-                <AvatarImage
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedConversation?.avatar}`}
-                />
-                <AvatarFallback>{selectedConversation?.name[0]}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-foreground">
-                    {selectedConversation?.name}
-                  </h3>
-                  <span className="status-approved">Active</span>
+          {selectedConversation ? (
+            <>
+              {/* Chat Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage
+                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${(selectedConversation as ConversationWithContact).contact?.name || (selectedConversation as ConversationWithContact).contact?.phone}`}
+                    />
+                    <AvatarFallback>
+                      {(selectedConversation as ConversationWithContact).contact?.name?.[0] || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-foreground">
+                        {(selectedConversation as ConversationWithContact).contact?.name || 
+                         (selectedConversation as ConversationWithContact).contact?.phone || "Unknown"}
+                      </h3>
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {selectedConversation.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {(selectedConversation as ConversationWithContact).contact?.phone}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {selectedConversation?.phone}
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon">
+                    <Phone className="w-5 h-5" />
+                  </Button>
+                  <Button variant="ghost" size="icon">
+                    <Star className="w-5 h-5" />
+                  </Button>
+                  <Button variant="ghost" size="icon">
+                    <Archive className="w-5 h-5" />
+                  </Button>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="w-5 h-5" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <ScrollArea className="flex-1 p-6">
+                {messagesLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <MessageSquare className="w-12 h-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No messages yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Start the conversation by sending a message
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {messages.map((message) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "flex",
+                          message.direction === "outbound" ? "justify-end" : "justify-start"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "max-w-[70%] px-4 py-3 rounded-2xl",
+                            message.direction === "outbound"
+                              ? "bg-primary text-primary-foreground rounded-br-md"
+                              : "bg-muted text-foreground rounded-bl-md"
+                          )}
+                        >
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          <div
+                            className={cn(
+                              "flex items-center gap-1 mt-1.5",
+                              message.direction === "outbound"
+                                ? "justify-end text-primary-foreground/70"
+                                : "text-muted-foreground"
+                            )}
+                          >
+                            <span className="text-xs">
+                              {message.created_at
+                                ? format(new Date(message.created_at), "h:mm a")
+                                : ""}
+                            </span>
+                            {message.direction === "outbound" && getMessageStatus(message)}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+              </ScrollArea>
+
+              {/* Message Input */}
+              <div className="p-4 border-t border-border bg-muted/30">
+                <div className="flex items-end gap-3">
+                  <div className="flex-1 relative">
+                    <Textarea
+                      placeholder="Type a message..."
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      onKeyDown={handleKeyPress}
+                      className="min-h-[48px] max-h-32 resize-none pr-24 bg-background"
+                      rows={1}
+                    />
+                    <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Paperclip className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Smile className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button 
+                    className="btn-whatsapp h-12 px-6"
+                    onClick={handleSendMessage}
+                    disabled={!messageText.trim() || sendMessage.isPending}
+                  >
+                    {sendMessage.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <MessageSquare className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium">Select a conversation</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Choose a conversation from the list to start messaging
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">
-                <Phone className="w-5 h-5" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Star className="w-5 h-5" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Archive className="w-5 h-5" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <MoreVertical className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <ScrollArea className="flex-1 p-6">
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={cn(
-                    "flex",
-                    message.type === "outbound" ? "justify-end" : "justify-start"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "max-w-[70%] px-4 py-3 rounded-2xl",
-                      message.type === "outbound"
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-muted text-foreground rounded-bl-md"
-                    )}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-                    <div
-                      className={cn(
-                        "flex items-center gap-1 mt-1.5",
-                        message.type === "outbound"
-                          ? "justify-end text-primary-foreground/70"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      <span className="text-xs">{message.time}</span>
-                      {message.type === "outbound" && (
-                        <CheckCheck className="w-3.5 h-3.5" />
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </ScrollArea>
-
-          {/* Message Input */}
-          <div className="p-4 border-t border-border bg-muted/30">
-            <div className="flex items-end gap-3">
-              <div className="flex-1 relative">
-                <Textarea
-                  placeholder="Type a message..."
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  className="min-h-[48px] max-h-32 resize-none pr-24 bg-background"
-                  rows={1}
-                />
-                <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Paperclip className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Smile className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-              <Button className="btn-whatsapp h-12 px-6">
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Contact Details Sidebar */}
-        <div className="w-80 border-l border-border p-6 hidden xl:block">
-          <div className="text-center mb-6">
-            <Avatar className="w-20 h-20 mx-auto mb-3">
-              <AvatarImage
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedConversation?.avatar}`}
-              />
-              <AvatarFallback>{selectedConversation?.name[0]}</AvatarFallback>
-            </Avatar>
-            <h3 className="font-semibold text-lg">{selectedConversation?.name}</h3>
-            <p className="text-sm text-muted-foreground">{selectedConversation?.phone}</p>
+        {selectedConversation && (
+          <div className="w-80 border-l border-border p-6 hidden xl:block">
+            <div className="text-center mb-6">
+              <Avatar className="w-20 h-20 mx-auto mb-3">
+                <AvatarImage
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${(selectedConversation as ConversationWithContact).contact?.name || (selectedConversation as ConversationWithContact).contact?.phone}`}
+                />
+                <AvatarFallback>
+                  {(selectedConversation as ConversationWithContact).contact?.name?.[0] || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <h3 className="font-semibold text-lg">
+                {(selectedConversation as ConversationWithContact).contact?.name || "Unknown"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {(selectedConversation as ConversationWithContact).contact?.phone}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-muted/50">
+                <h4 className="text-sm font-medium mb-3">Contact Info</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Email</span>
+                    <span>{(selectedConversation as ConversationWithContact).contact?.email || "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className="capitalize">{selectedConversation.status}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Session Active</span>
+                    <span>{selectedConversation.is_session_active ? "Yes" : "No"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {(selectedConversation as ConversationWithContact).contact?.tags && 
+               (selectedConversation as ConversationWithContact).contact.tags!.length > 0 && (
+                <div className="p-4 rounded-xl bg-muted/50">
+                  <h4 className="text-sm font-medium mb-3">Tags</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedConversation as ConversationWithContact).contact.tags!.map((tag) => (
+                      <Badge key={tag} variant="secondary">{tag}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 rounded-xl bg-muted/50">
+                <h4 className="text-sm font-medium mb-3">Activity</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">
+                      Last message: {selectedConversation.last_message_at
+                        ? format(new Date(selectedConversation.last_message_at), "MMM d, h:mm a")
+                        : "Never"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-muted/50">
-              <h4 className="text-sm font-medium mb-3">Contact Info</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Email</span>
-                  <span>sarah@example.com</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Location</span>
-                  <span>New York, USA</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">First Contact</span>
-                  <span>Jan 5, 2026</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-muted/50">
-              <h4 className="text-sm font-medium mb-3">Tags</h4>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">Premium Lead</Badge>
-                <Badge variant="secondary">Demo Scheduled</Badge>
-                <Badge variant="secondary">Enterprise</Badge>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-muted/50">
-              <h4 className="text-sm font-medium mb-3">Activity</h4>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">
-                    Opened email 2 hours ago
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <CheckCheck className="w-4 h-4 text-primary" />
-                  <span className="text-muted-foreground">
-                    Last message read
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </DashboardLayout>
   );
