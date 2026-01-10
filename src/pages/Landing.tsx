@@ -630,7 +630,16 @@ const Landing = () => {
 
           <div className="border-t mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 WhatsFlow. All rights reserved.
+              © 2026 WhatsFlow by{" "}
+              <a
+                href="https://keyrundigital.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                KeyRun Digital
+              </a>
+              . All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <Globe className="h-4 w-4 text-muted-foreground" />

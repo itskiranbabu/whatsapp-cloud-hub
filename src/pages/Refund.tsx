@@ -269,13 +269,13 @@ const Refund = () => {
                 <p>
                   Email:{" "}
                   <a
-                    href="mailto:support@whatsflow.com"
+                    href="mailto:support@keyrundigital.com"
                     className="text-primary hover:underline"
                   >
-                    support@whatsflow.com
+                    support@keyrundigital.com
                   </a>
                 </p>
-                <p>Phone: +91 1800-XXX-XXXX (Mon-Sat, 9 AM - 6 PM IST)</p>
+                <p>Phone: +91 93474 43043 (Mon-Sat, 9 AM - 6 PM IST)</p>
                 <p>Response Time: Within 24-48 hours</p>
               </div>
             </section>
@@ -300,7 +300,7 @@ const Refund = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 WhatsFlow. All rights reserved.
+              © 2026 WhatsFlow by KeyRun Digital. All rights reserved.
             </p>
             <div className="flex gap-6">
               <Link
