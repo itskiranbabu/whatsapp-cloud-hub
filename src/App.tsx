@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import Index from "./pages/Index";
 import Inbox from "./pages/Inbox";
 import Campaigns from "./pages/Campaigns";
@@ -10,6 +12,7 @@ import Templates from "./pages/Templates";
 import Contacts from "./pages/Contacts";
 import Automation from "./pages/Automation";
 import Analytics from "./pages/Analytics";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,16 +23,68 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/campaigns" element={<Campaigns />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/automation" element={<Automation />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/inbox"
+              element={
+                <ProtectedRoute>
+                  <Inbox />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/campaigns"
+              element={
+                <ProtectedRoute>
+                  <Campaigns />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates"
+              element={
+                <ProtectedRoute>
+                  <Templates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/contacts"
+              element={
+                <ProtectedRoute>
+                  <Contacts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/automation"
+              element={
+                <ProtectedRoute>
+                  <Automation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedRoute>
+                  <Analytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
