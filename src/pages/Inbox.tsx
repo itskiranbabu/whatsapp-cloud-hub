@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,6 +21,7 @@ import {
   Loader2,
   MessageSquare,
   Check,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
+import { SmartReplyPanel } from "@/components/inbox/SmartReplyPanel";
 
 type Conversation = Tables<"conversations">;
 type Message = Tables<"messages">;
@@ -51,12 +53,18 @@ const Inbox = () => {
   const [messageText, setMessageText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "starred">("all");
+  const [showSmartReply, setShowSmartReply] = useState(true);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { messages, isLoading: messagesLoading, sendMessage } = useMessages(
     selectedConversation?.id || null
   );
+
+  // Get the last inbound message for smart replies
+  const lastInboundMessage = useMemo(() => {
+    return messages.filter(m => m.direction === 'inbound').pop();
+  }, [messages]);
 
   // Auto-select first conversation
   useEffect(() => {
@@ -351,8 +359,28 @@ const Inbox = () => {
                 )}
               </ScrollArea>
 
+              {/* Smart Reply Panel */}
+              <SmartReplyPanel
+                customerMessage={lastInboundMessage?.content || null}
+                conversationHistory={messages.map(m => ({ direction: m.direction, content: m.content }))}
+                contactName={(selectedConversation as ConversationWithContact).contact?.name || null}
+                onSelectReply={(text) => setMessageText(text)}
+                isVisible={showSmartReply && !!lastInboundMessage}
+              />
+
               {/* Message Input */}
               <div className="p-4 border-t border-border bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                    onClick={() => setShowSmartReply(!showSmartReply)}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {showSmartReply ? "Hide" : "Show"} AI Suggestions
+                  </Button>
+                </div>
                 <div className="flex items-end gap-3">
                   <div className="flex-1 relative">
                     <Textarea

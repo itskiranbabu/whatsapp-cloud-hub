@@ -17,6 +17,8 @@ import {
   Building2,
   Check,
   ChevronsUpDown,
+  Puzzle,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +40,8 @@ const navigationItems = [
   { icon: Users, label: "Contacts", path: "/contacts" },
   { icon: Bot, label: "Automation", path: "/automation" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
+  { icon: Megaphone, label: "Ads Manager", path: "/ads" },
+  { icon: Puzzle, label: "Integrations", path: "/integrations" },
 ];
 
 const bottomItems = [
