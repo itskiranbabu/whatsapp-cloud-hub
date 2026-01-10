@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const navigationItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: MessageSquare, label: "Inbox", path: "/inbox" },
   { icon: Send, label: "Campaigns", path: "/campaigns" },
   { icon: FileText, label: "Templates", path: "/templates" },
@@ -145,7 +145,10 @@ export const Sidebar = () => {
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto scrollbar-hide">
         {navigationItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive =
+            item.path === "/dashboard"
+              ? location.pathname === "/dashboard"
+              : location.pathname.startsWith(item.path);
           return (
             <Link
               key={item.path}
@@ -187,7 +190,7 @@ export const Sidebar = () => {
       {/* Bottom Navigation */}
       <div className="px-3 py-2 border-t border-sidebar-border space-y-1">
         {bottomItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname.startsWith(item.path);
           return (
             <Link
               key={item.path}

@@ -37,8 +37,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
+  const [bootstrappedForUser, setBootstrappedForUser] = useState<string | null>(null);
 
   const isSuperAdmin = roles.some(r => r.role === 'super_admin');
+
+  const bootstrapTenantIfNeeded = async (userId: string) => {
+    if (bootstrappedForUser === userId) return;
+    setBootstrappedForUser(userId);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("bootstrap-tenant", {
+        body: {},
+      });
+
+      if (error) {
+        console.error("bootstrap-tenant invoke error:", error);
+        return;
+      }
+
+      const tenantId = (data as { tenant_id?: string })?.tenant_id || null;
+      if (tenantId) setCurrentTenantId(tenantId);
+    } catch (err) {
+      console.error("bootstrap-tenant unexpected error:", err);
+    }
+  };
 
   const fetchUserRoles = async (userId: string) => {
     try {
@@ -52,14 +74,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      setRoles(data || []);
-      
-      // Set default tenant if user has one
-      if (data && data.length > 0 && !currentTenantId) {
-        const firstTenantRole = data.find(r => r.tenant_id);
-        if (firstTenantRole) {
-          setCurrentTenantId(firstTenantRole.tenant_id);
+      const rolesData = data || [];
+      setRoles(rolesData);
+
+      // If user has no tenant yet, auto-create one (first login experience)
+      let effectiveRoles = rolesData;
+      if (rolesData.length === 0) {
+        await bootstrapTenantIfNeeded(userId);
+        // re-fetch roles after bootstrap
+        const { data: roles2, error: error2 } = await supabase
+          .from('user_roles')
+          .select('id, tenant_id, role')
+          .eq('user_id', userId);
+        if (!error2 && roles2) {
+          effectiveRoles = roles2;
+          setRoles(roles2);
         }
+      }
+
+      // Set default tenant if user has one
+      if (!currentTenantId) {
+        const firstTenantRole = effectiveRoles.find(r => r.tenant_id);
+        if (firstTenantRole?.tenant_id) setCurrentTenantId(firstTenantRole.tenant_id);
       }
     } catch (err) {
       console.error('Error in fetchUserRoles:', err);

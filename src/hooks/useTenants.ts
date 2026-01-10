@@ -16,16 +16,14 @@ export interface Tenant {
 }
 
 export const useTenants = () => {
-  const { user, isSuperAdmin } = useAuth();
+  const { user, currentTenantId, setCurrentTenantId, isSuperAdmin } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchTenants = async () => {
     if (!user) {
       setTenants([]);
-      setCurrentTenant(null);
       setIsLoading(false);
       return;
     }
@@ -37,15 +35,8 @@ export const useTenants = () => {
         .select('*')
         .order('name');
 
-      if (fetchError) {
-        throw fetchError;
-      }
-
+      if (fetchError) throw fetchError;
       setTenants(data || []);
-      // Set first tenant as current if none selected
-      if (data && data.length > 0 && !currentTenant) {
-        setCurrentTenant(data[0]);
-      }
     } catch (err) {
       console.error('Error fetching tenants:', err);
       setError(err as Error);
@@ -58,6 +49,8 @@ export const useTenants = () => {
     fetchTenants();
   }, [user]);
 
+  const currentTenant = tenants.find((t) => t.id === currentTenantId) || null;
+
   const createTenant = async (tenantData: { name: string; slug: string } & Partial<Omit<Tenant, 'name' | 'slug'>>) => {
     const { data, error } = await supabase
       .from('tenants')
@@ -66,14 +59,14 @@ export const useTenants = () => {
       .single();
 
     if (error) throw error;
-    
+
     await fetchTenants();
+    if (data?.id) setCurrentTenantId(data.id);
     return data;
   };
 
   const switchTenant = (tenantId: string) => {
-    const tenant = tenants.find(t => t.id === tenantId);
-    if (tenant) setCurrentTenant(tenant);
+    setCurrentTenantId(tenantId);
   };
 
   return {
@@ -84,5 +77,6 @@ export const useTenants = () => {
     refetch: fetchTenants,
     createTenant,
     switchTenant,
+    isSuperAdmin,
   };
 };

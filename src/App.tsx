@@ -14,6 +14,8 @@ import Templates from "./pages/Templates";
 import Contacts from "./pages/Contacts";
 import Automation from "./pages/Automation";
 import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
+import Support from "./pages/Support";
 import Auth from "./pages/Auth";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -101,6 +103,22 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Analytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/support"
+                element={
+                  <ProtectedRoute>
+                    <Support />
                   </ProtectedRoute>
                 }
               />
