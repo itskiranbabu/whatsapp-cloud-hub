@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      ads: {
+        Row: {
+          ad_account_id: string | null
+          budget: number | null
+          campaign_id: string | null
+          clicks: number | null
+          cost_per_message: number | null
+          created_at: string
+          id: string
+          impressions: number | null
+          messages: number | null
+          meta_ad_id: string | null
+          name: string
+          platform: string
+          spent: number | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ad_account_id?: string | null
+          budget?: number | null
+          campaign_id?: string | null
+          clicks?: number | null
+          cost_per_message?: number | null
+          created_at?: string
+          id?: string
+          impressions?: number | null
+          messages?: number | null
+          meta_ad_id?: string | null
+          name: string
+          platform?: string
+          spent?: number | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ad_account_id?: string | null
+          budget?: number | null
+          campaign_id?: string | null
+          clicks?: number | null
+          cost_per_message?: number | null
+          created_at?: string
+          id?: string
+          impressions?: number | null
+          messages?: number | null
+          meta_ad_id?: string | null
+          name?: string
+          platform?: string
+          spent?: number | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automations: {
         Row: {
           created_at: string | null
@@ -251,6 +316,56 @@ export type Database = {
           },
           {
             foreignKeyName: "conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          config: Json | null
+          created_at: string
+          credentials: Json | null
+          error_message: string | null
+          id: string
+          integration_type: string
+          last_sync_at: string | null
+          name: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string
+          credentials?: Json | null
+          error_message?: string | null
+          id?: string
+          integration_type: string
+          last_sync_at?: string | null
+          name: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string
+          credentials?: Json | null
+          error_message?: string | null
+          id?: string
+          integration_type?: string
+          last_sync_at?: string | null
+          name?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

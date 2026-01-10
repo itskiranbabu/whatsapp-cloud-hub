@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -30,6 +30,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Plus,
   Search,
@@ -37,11 +44,8 @@ import {
   ExternalLink,
   Facebook,
   TrendingUp,
-  Users,
-  DollarSign,
   MessageSquare,
   Eye,
-  MousePointer,
   Pause,
   Play,
   Trash2,
@@ -53,77 +57,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useAds } from "@/hooks/useAds";
+import { useTenants } from "@/hooks/useTenants";
 import { format } from "date-fns";
-
-interface Ad {
-  id: string;
-  name: string;
-  status: "active" | "paused" | "completed" | "draft";
-  platform: "facebook" | "instagram";
-  budget: number;
-  spent: number;
-  impressions: number;
-  clicks: number;
-  messages: number;
-  costPerMessage: number;
-  createdAt: string;
-}
-
-const demoAds: Ad[] = [
-  {
-    id: "1",
-    name: "Summer Sale - Click to WhatsApp",
-    status: "active",
-    platform: "facebook",
-    budget: 5000,
-    spent: 2340,
-    impressions: 45600,
-    clicks: 1230,
-    messages: 456,
-    costPerMessage: 5.13,
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "New Product Launch",
-    status: "active",
-    platform: "instagram",
-    budget: 3000,
-    spent: 1890,
-    impressions: 32100,
-    clicks: 890,
-    messages: 234,
-    costPerMessage: 8.08,
-    createdAt: "2024-01-20",
-  },
-  {
-    id: "3",
-    name: "Holiday Promotion",
-    status: "completed",
-    platform: "facebook",
-    budget: 10000,
-    spent: 10000,
-    impressions: 156000,
-    clicks: 4500,
-    messages: 1234,
-    costPerMessage: 8.10,
-    createdAt: "2024-01-01",
-  },
-  {
-    id: "4",
-    name: "Lead Generation Q1",
-    status: "paused",
-    platform: "facebook",
-    budget: 2000,
-    spent: 450,
-    impressions: 8900,
-    clicks: 234,
-    messages: 67,
-    costPerMessage: 6.72,
-    createdAt: "2024-02-01",
-  },
-];
 
 const statusConfig = {
   active: { label: "Active", color: "bg-green-100 text-green-700" },
@@ -133,18 +69,21 @@ const statusConfig = {
 };
 
 const AdsManager = () => {
-  const [ads, setAds] = useState<Ad[]>(demoAds);
+  const { ads, isLoading, stats, createAd, deleteAd, toggleAdStatus } = useAds();
+  const { currentTenant } = useTenants();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const { toast } = useToast();
+  const [newAd, setNewAd] = useState({
+    name: "",
+    platform: "facebook" as "facebook" | "instagram",
+    budget: "",
+    objective: "",
+  });
 
-  const totalSpent = ads.reduce((sum, ad) => sum + ad.spent, 0);
-  const totalMessages = ads.reduce((sum, ad) => sum + ad.messages, 0);
-  const avgCpm = totalMessages > 0 ? totalSpent / totalMessages : 0;
-  const activeAds = ads.filter(ad => ad.status === "active").length;
+  // Check if Meta is connected via tenant settings
+  const isConnected = !!currentTenant?.waba_id;
 
   const filteredAds = ads.filter(ad =>
     ad.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -152,44 +91,53 @@ const AdsManager = () => {
 
   const handleConnect = async () => {
     setIsConnecting(true);
+    // This would redirect to Meta OAuth in production
     await new Promise(resolve => setTimeout(resolve, 2000));
     setIsConnecting(false);
-    setIsConnected(true);
     setShowConnectDialog(false);
-    toast({
-      title: "Facebook connected",
-      description: "Your Meta Business account has been connected successfully",
-    });
+    // Would update tenant with Meta credentials
   };
 
-  const handleToggleStatus = (id: string) => {
-    setAds(ads.map(ad => {
-      if (ad.id === id) {
-        const newStatus = ad.status === "active" ? "paused" : "active";
-        return { ...ad, status: newStatus };
-      }
-      return ad;
-    }));
-    toast({
-      title: "Ad status updated",
-      description: "The ad status has been changed",
+  const handleCreateAd = async () => {
+    if (!newAd.name.trim()) return;
+    
+    await createAd.mutateAsync({
+      name: newAd.name,
+      platform: newAd.platform,
+      budget: parseFloat(newAd.budget) || 0,
+      status: "draft",
     });
+    
+    setShowCreateDialog(false);
+    setNewAd({ name: "", platform: "facebook", budget: "", objective: "" });
   };
 
-  const handleDelete = (id: string) => {
-    setAds(ads.filter(ad => ad.id !== id));
-    toast({
-      title: "Ad deleted",
-      description: "The ad has been removed",
-    });
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    await toggleAdStatus.mutateAsync({ id, currentStatus });
   };
+
+  const handleDelete = async (id: string) => {
+    await deleteAd.mutateAsync(id);
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Ads Manager" subtitle="Create and manage Click-to-WhatsApp ads">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (!isConnected) {
     return (
-      <DashboardLayout
-        title="Ads Manager"
-        subtitle="Create and manage Click-to-WhatsApp ads"
-      >
+      <DashboardLayout title="Ads Manager" subtitle="Create and manage Click-to-WhatsApp ads">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -263,15 +211,8 @@ const AdsManager = () => {
   }
 
   return (
-    <DashboardLayout
-      title="Ads Manager"
-      subtitle="Create and manage Click-to-WhatsApp ads"
-    >
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="space-y-6"
-      >
+    <DashboardLayout title="Ads Manager" subtitle="Create and manage Click-to-WhatsApp ads">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -279,10 +220,10 @@ const AdsManager = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Spent</p>
-                  <p className="text-2xl font-bold">₹{totalSpent.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">₹{stats.totalSpent.toLocaleString()}</p>
                   <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
                     <ArrowUpRight className="w-3 h-3" />
-                    +12% this month
+                    Track your ad spend
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-primary/10">
@@ -296,10 +237,10 @@ const AdsManager = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Messages</p>
-                  <p className="text-2xl font-bold">{totalMessages.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">{stats.totalMessages.toLocaleString()}</p>
                   <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
                     <ArrowUpRight className="w-3 h-3" />
-                    +23% this month
+                    WhatsApp conversations started
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-green-500/10">
@@ -313,11 +254,8 @@ const AdsManager = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg. Cost/Message</p>
-                  <p className="text-2xl font-bold">₹{avgCpm.toFixed(2)}</p>
-                  <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
-                    <ArrowDownRight className="w-3 h-3" />
-                    -5% this month
-                  </p>
+                  <p className="text-2xl font-bold">₹{stats.avgCostPerMessage.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Cost efficiency metric</p>
                 </div>
                 <div className="p-3 rounded-xl bg-blue-500/10">
                   <TrendingUp className="w-5 h-5 text-blue-600" />
@@ -330,7 +268,7 @@ const AdsManager = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Active Campaigns</p>
-                  <p className="text-2xl font-bold">{activeAds}</p>
+                  <p className="text-2xl font-bold">{stats.activeAds}</p>
                   <p className="text-xs text-muted-foreground mt-1">of {ads.length} total</p>
                 </div>
                 <div className="p-3 rounded-xl bg-amber-500/10">
@@ -361,106 +299,113 @@ const AdsManager = () => {
         {/* Ads Table */}
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Budget</TableHead>
-                  <TableHead>Spent</TableHead>
-                  <TableHead>Impressions</TableHead>
-                  <TableHead>Clicks</TableHead>
-                  <TableHead>Messages</TableHead>
-                  <TableHead>CPM</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAds.map((ad, index) => (
-                  <motion.tr
-                    key={ad.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="group hover:bg-muted/50"
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          ad.platform === "facebook" ? "bg-blue-100" : "bg-gradient-to-br from-purple-500 to-pink-500"
-                        }`}>
-                          {ad.platform === "facebook" ? (
-                            <Facebook className="w-4 h-4 text-blue-600" />
-                          ) : (
-                            <span className="text-white text-xs font-bold">IG</span>
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">{ad.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Created {format(new Date(ad.createdAt), "MMM d, yyyy")}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusConfig[ad.status].color}>
-                        {statusConfig[ad.status].label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">₹{ad.budget.toLocaleString()}</TableCell>
-                    <TableCell>₹{ad.spent.toLocaleString()}</TableCell>
-                    <TableCell>{ad.impressions.toLocaleString()}</TableCell>
-                    <TableCell>{ad.clicks.toLocaleString()}</TableCell>
-                    <TableCell className="font-medium text-primary">{ad.messages}</TableCell>
-                    <TableCell>₹{ad.costPerMessage.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleToggleStatus(ad.id)}>
-                            {ad.status === "active" ? (
-                              <>
-                                <Pause className="w-4 h-4 mr-2" />
-                                Pause
-                              </>
+            {filteredAds.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <Target className="w-12 h-12 text-muted-foreground/30 mb-4" />
+                <h3 className="font-medium text-lg">No campaigns yet</h3>
+                <p className="text-muted-foreground mt-1">Create your first Click-to-WhatsApp ad campaign</p>
+                <Button onClick={() => setShowCreateDialog(true)} className="mt-4 gap-2">
+                  <Plus className="w-4 h-4" />
+                  Create Campaign
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Budget</TableHead>
+                    <TableHead>Spent</TableHead>
+                    <TableHead>Impressions</TableHead>
+                    <TableHead>Clicks</TableHead>
+                    <TableHead>Messages</TableHead>
+                    <TableHead>CPM</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAds.map((ad, index) => (
+                    <motion.tr
+                      key={ad.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="group hover:bg-muted/50"
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            ad.platform === "facebook" 
+                              ? "bg-blue-100" 
+                              : "bg-gradient-to-br from-purple-500 to-pink-500"
+                          }`}>
+                            {ad.platform === "facebook" ? (
+                              <Facebook className="w-4 h-4 text-blue-600" />
                             ) : (
-                              <>
-                                <Play className="w-4 h-4 mr-2" />
-                                Resume
-                              </>
+                              <span className="text-white text-xs font-bold">IG</span>
                             )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Copy className="w-4 h-4 mr-2" />
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDelete(ad.id)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </motion.tr>
-                ))}
-              </TableBody>
-            </Table>
+                          </div>
+                          <div>
+                            <p className="font-medium">{ad.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Created {format(new Date(ad.created_at), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusConfig[ad.status].color}>
+                          {statusConfig[ad.status].label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">₹{Number(ad.budget).toLocaleString()}</TableCell>
+                      <TableCell>₹{Number(ad.spent).toLocaleString()}</TableCell>
+                      <TableCell>{ad.impressions.toLocaleString()}</TableCell>
+                      <TableCell>{ad.clicks.toLocaleString()}</TableCell>
+                      <TableCell className="font-medium text-primary">{ad.messages}</TableCell>
+                      <TableCell>₹{Number(ad.cost_per_message).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleStatus(ad.id, ad.status)}>
+                              {ad.status === "active" ? (
+                                <>
+                                  <Pause className="w-4 h-4 mr-2" />
+                                  Pause
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="w-4 h-4 mr-2" />
+                                  Resume
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Copy className="w-4 h-4 mr-2" />
+                              Duplicate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(ad.id)}>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </motion.tr>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -476,32 +421,56 @@ const AdsManager = () => {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Campaign Name</Label>
-                <Input placeholder="e.g., Summer Sale Promotion" />
+                <Input 
+                  placeholder="e.g., Summer Sale Promotion"
+                  value={newAd.name}
+                  onChange={(e) => setNewAd({ ...newAd, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Platform</Label>
+                <Select
+                  value={newAd.platform}
+                  onValueChange={(v: "facebook" | "instagram") => setNewAd({ ...newAd, platform: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Daily Budget (₹)</Label>
-                <Input type="number" placeholder="500" />
-              </div>
-              <div className="space-y-2">
-                <Label>Welcome Message</Label>
-                <Textarea 
-                  placeholder="Hi! Thanks for your interest. How can I help you today?"
-                  rows={3}
+                <Input 
+                  type="number" 
+                  placeholder="500"
+                  value={newAd.budget}
+                  onChange={(e) => setNewAd({ ...newAd, budget: e.target.value })}
                 />
               </div>
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground">
-                  After creating, you'll be redirected to Facebook Ads Manager to complete your ad setup including targeting, creative, and placement.
-                </p>
+              <div className="space-y-2">
+                <Label>Campaign Objective</Label>
+                <Textarea 
+                  placeholder="Describe what you want to achieve..."
+                  value={newAd.objective}
+                  onChange={(e) => setNewAd({ ...newAd, objective: e.target.value })}
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                Cancel
-              </Button>
-              <Button>
-                Create & Continue
-                <ExternalLink className="w-4 h-4 ml-2" />
+              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
+              <Button onClick={handleCreateAd} disabled={createAd.isPending}>
+                {createAd.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Campaign"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
