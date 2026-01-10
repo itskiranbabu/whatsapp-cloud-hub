@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
+import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Inbox from "./pages/Inbox";
 import Campaigns from "./pages/Campaigns";
@@ -14,6 +15,11 @@ import Contacts from "./pages/Contacts";
 import Automation from "./pages/Automation";
 import Analytics from "./pages/Analytics";
 import Auth from "./pages/Auth";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Refund from "./pages/Refund";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 
 // Create QueryClient inside the module scope but ensure it's stable
@@ -35,9 +41,15 @@ const App: React.FC = () => {
         <BrowserRouter>
           <AuthProvider>
             <Routes>
+              <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/refund" element={<Refund />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
               <Route
-                path="/"
+                path="/dashboard"
                 element={
                   <ProtectedRoute>
                     <Index />
