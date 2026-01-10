@@ -22,6 +22,8 @@ import Privacy from "./pages/Privacy";
 import Refund from "./pages/Refund";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import Integrations from "./pages/Integrations";
+import AdsManager from "./pages/AdsManager";
 import NotFound from "./pages/NotFound";
 
 // Create QueryClient inside the module scope but ensure it's stable
@@ -119,6 +121,22 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Support />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/integrations"
+                element={
+                  <ProtectedRoute>
+                    <Integrations />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ads"
+                element={
+                  <ProtectedRoute>
+                    <AdsManager />
                   </ProtectedRoute>
                 }
               />
