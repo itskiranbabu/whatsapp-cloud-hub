@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { GlobalHelpButton } from "@/components/help/GlobalHelpButton";
 
 interface HeaderProps {
   title: string;
@@ -72,6 +73,9 @@ export const Header = ({ title, subtitle }: HeaderProps) => {
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Message</span>
           </Button>
+
+          {/* Global Help Button */}
+          <GlobalHelpButton />
 
           {/* Notifications */}
           <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">

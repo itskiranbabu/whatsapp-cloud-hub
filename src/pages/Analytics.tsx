@@ -30,6 +30,7 @@ import {
   Reply,
 } from "lucide-react";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { AnalyticsPageHelp, AnalyticsContextualHelp } from "@/components/help/PageHelpComponents";
 
 const Analytics = () => {
   const [period, setPeriod] = useState(7);
@@ -64,6 +65,12 @@ const Analytics = () => {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
+        {/* Header with Help */}
+        <div className="flex items-center justify-between">
+          <AnalyticsContextualHelp />
+          <AnalyticsPageHelp />
+        </div>
+
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="metric-card-primary">
