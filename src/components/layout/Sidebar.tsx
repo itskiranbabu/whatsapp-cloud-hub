@@ -46,7 +46,7 @@ const navigationItems = [
 
 const bottomItems = [
   { icon: Settings, label: "Settings", path: "/settings" },
-  { icon: HelpCircle, label: "Help & Support", path: "/support" },
+  { icon: HelpCircle, label: "Help Center", path: "/help" },
 ];
 
 export const Sidebar = () => {

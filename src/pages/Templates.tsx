@@ -48,6 +48,8 @@ import { useTemplates, Template } from "@/hooks/useTemplates";
 import { WhatsAppPhonePreview } from "@/components/whatsapp/WhatsAppPhonePreview";
 import { TemplateGallery } from "@/components/templates/TemplateGallery";
 import { TemplateBuilder } from "@/components/templates/TemplateBuilder";
+import { ContextualHelp } from "@/components/help/ContextualHelp";
+import { PageHelp } from "@/components/help/PageHelp";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -229,6 +231,19 @@ const Templates = () => {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
+        {/* Contextual Help */}
+        <ContextualHelp
+          title="Template Messages Guide"
+          description="Templates are pre-approved message formats required to initiate conversations outside the 24-hour window."
+          variant="guide"
+          tips={[
+            "Use variables like {{1}}, {{2}} for personalization - they get replaced with actual values when sending",
+            "Marketing templates take longer to approve - utility templates are usually faster",
+            "Always include an opt-out option in marketing templates to comply with WhatsApp policy",
+            "Test your templates with the live preview before submitting for approval",
+          ]}
+          defaultExpanded={false}
+        />
         {/* AI Generation Banner */}
         <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/20 overflow-hidden">
           <CardContent className="flex items-center justify-between p-4">

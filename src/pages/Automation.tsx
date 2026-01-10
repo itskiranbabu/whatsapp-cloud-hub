@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FlowBuilder } from "@/components/automation/FlowBuilder";
+import { ContextualHelp } from "@/components/help/ContextualHelp";
 import { useAutomations } from "@/hooks/useAutomations";
 import { useToast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
@@ -164,6 +165,20 @@ const Automation = () => {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
+        {/* Contextual Help */}
+        <ContextualHelp
+          title="Automation & Chatbot Builder"
+          description="Create automated workflows to handle common queries, send welcome messages, and nurture leads automatically."
+          variant="guide"
+          tips={[
+            "Start with a trigger (e.g., message received, keyword detected) to initiate the flow",
+            "Use conditions to branch logic based on user responses",
+            "Add delays between messages to make conversations feel natural",
+            "Test your automation before activating to ensure it works as expected",
+          ]}
+          defaultExpanded={false}
+        />
+
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="metric-card-primary">
