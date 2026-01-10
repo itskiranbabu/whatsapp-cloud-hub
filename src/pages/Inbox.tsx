@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,9 @@ import { format } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import { SmartReplyPanel } from "@/components/inbox/SmartReplyPanel";
 import { HelpTooltip } from "@/components/help/HelpTooltip";
+import { TypingIndicator } from "@/components/inbox/TypingIndicator";
+import { OnlineStatus } from "@/components/inbox/OnlineStatus";
+import { useSimulatedPresence } from "@/hooks/usePresence";
 
 type Conversation = Tables<"conversations">;
 type Message = Tables<"messages">;
@@ -58,6 +61,9 @@ const Inbox = () => {
   const [showSmartReply, setShowSmartReply] = useState(true);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Presence tracking for selected conversation
+  const { contactPresence } = useSimulatedPresence(selectedConversation?.id || null);
   
   const { messages, isLoading: messagesLoading, sendMessage } = useMessages(
     selectedConversation?.id || null
@@ -264,14 +270,23 @@ const Inbox = () => {
               {/* Chat Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${(selectedConversation as ConversationWithContact).contact?.name || (selectedConversation as ConversationWithContact).contact?.phone}`}
-                    />
-                    <AvatarFallback>
-                      {(selectedConversation as ConversationWithContact).contact?.name?.[0] || "?"}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${(selectedConversation as ConversationWithContact).contact?.name || (selectedConversation as ConversationWithContact).contact?.phone}`}
+                      />
+                      <AvatarFallback>
+                        {(selectedConversation as ConversationWithContact).contact?.name?.[0] || "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="absolute bottom-0 right-0">
+                      <OnlineStatus 
+                        isOnline={contactPresence.isOnline} 
+                        lastSeen={contactPresence.lastSeen}
+                        size="sm"
+                      />
+                    </span>
+                  </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-foreground">
@@ -282,9 +297,12 @@ const Inbox = () => {
                         {selectedConversation.status}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {(selectedConversation as ConversationWithContact).contact?.phone}
-                    </p>
+                    <OnlineStatus 
+                      isOnline={contactPresence.isOnline} 
+                      lastSeen={contactPresence.lastSeen}
+                      showLabel
+                      size="sm"
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -356,6 +374,14 @@ const Inbox = () => {
                         </div>
                       </motion.div>
                     ))}
+                    {/* Typing Indicator */}
+                    <AnimatePresence>
+                      {contactPresence.isTyping && (
+                        <TypingIndicator 
+                          contactName={(selectedConversation as ConversationWithContact).contact?.name || undefined} 
+                        />
+                      )}
+                    </AnimatePresence>
                     <div ref={messagesEndRef} />
                   </div>
                 )}
