@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.whatsapp-broadcast]
 verify_jwt = false
+
+[functions.ai-smart-reply]
+verify_jwt = false
+
+[functions.bootstrap-tenant]
+verify_jwt = false
