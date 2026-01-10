@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -30,133 +31,10 @@ import {
   Loader2,
   Star,
   Zap,
+  AlertCircle,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useIntegrations, integrationsCatalog } from "@/hooks/useIntegrations";
 import { IntegrationsPageHelp, IntegrationsContextualHelp } from "@/components/help/PageHelpComponents";
-interface Integration {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  icon: string;
-  status: "connected" | "available" | "coming_soon";
-  popular?: boolean;
-  features: string[];
-}
-
-const integrations: Integration[] = [
-  {
-    id: "shopify",
-    name: "Shopify",
-    description: "Sync orders, send tracking updates, and automate abandoned cart recovery",
-    category: "ecommerce",
-    icon: "🛒",
-    status: "available",
-    popular: true,
-    features: ["Order notifications", "Abandoned cart recovery", "Shipping updates", "Product catalog sync"],
-  },
-  {
-    id: "woocommerce",
-    name: "WooCommerce",
-    description: "Connect your WooCommerce store for automated order messaging",
-    category: "ecommerce",
-    icon: "🛍️",
-    status: "available",
-    features: ["Order confirmations", "Delivery notifications", "COD reminders", "Review collection"],
-  },
-  {
-    id: "razorpay",
-    name: "Razorpay",
-    description: "Send payment links and collect payments directly in WhatsApp",
-    category: "payments",
-    icon: "💳",
-    status: "available",
-    popular: true,
-    features: ["Payment links", "Payment reminders", "Success notifications", "Refund alerts"],
-  },
-  {
-    id: "stripe",
-    name: "Stripe",
-    description: "Accept payments and subscriptions through WhatsApp",
-    category: "payments",
-    icon: "💵",
-    status: "available",
-    features: ["One-click payments", "Subscription management", "Invoice delivery", "Payment receipts"],
-  },
-  {
-    id: "google_sheets",
-    name: "Google Sheets",
-    description: "Sync contacts and export conversation data to spreadsheets",
-    category: "productivity",
-    icon: "📊",
-    status: "available",
-    features: ["Contact sync", "Lead export", "Campaign reports", "Real-time updates"],
-  },
-  {
-    id: "zapier",
-    name: "Zapier",
-    description: "Connect to 5000+ apps with no-code automation",
-    category: "automation",
-    icon: "⚡",
-    status: "available",
-    popular: true,
-    features: ["Trigger workflows", "Multi-app automation", "Custom Zaps", "Scheduled actions"],
-  },
-  {
-    id: "dialogflow",
-    name: "Dialogflow",
-    description: "Build AI-powered chatbots with natural language processing",
-    category: "ai",
-    icon: "🤖",
-    status: "available",
-    features: ["Intent recognition", "Entity extraction", "Context handling", "Multi-language support"],
-  },
-  {
-    id: "hubspot",
-    name: "HubSpot",
-    description: "Sync contacts and deals with your HubSpot CRM",
-    category: "crm",
-    icon: "🧡",
-    status: "available",
-    features: ["Contact sync", "Deal tracking", "Activity logging", "Lead scoring"],
-  },
-  {
-    id: "salesforce",
-    name: "Salesforce",
-    description: "Enterprise CRM integration for sales teams",
-    category: "crm",
-    icon: "☁️",
-    status: "coming_soon",
-    features: ["Lead management", "Opportunity tracking", "Custom objects", "Workflow automation"],
-  },
-  {
-    id: "calendly",
-    name: "Calendly",
-    description: "Let customers book appointments directly from WhatsApp",
-    category: "productivity",
-    icon: "📅",
-    status: "available",
-    features: ["Appointment booking", "Reminders", "Rescheduling", "Calendar sync"],
-  },
-  {
-    id: "make",
-    name: "Make (Integromat)",
-    description: "Advanced automation with visual workflow builder",
-    category: "automation",
-    icon: "🔄",
-    status: "available",
-    features: ["Visual workflows", "Data transformation", "Error handling", "Scheduling"],
-  },
-  {
-    id: "freshdesk",
-    name: "Freshdesk",
-    description: "Convert WhatsApp conversations into support tickets",
-    category: "support",
-    icon: "🎫",
-    status: "coming_soon",
-    features: ["Ticket creation", "Agent assignment", "SLA tracking", "Knowledge base"],
-  },
-];
 
 const categories = [
   { id: "all", label: "All", icon: Plug },
@@ -171,12 +49,16 @@ const categories = [
 const Integrations = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>(["razorpay"]);
-  const { toast } = useToast();
+  const [selectedIntegration, setSelectedIntegration] = useState<typeof integrationsCatalog[0] | null>(null);
+  const { 
+    allIntegrations, 
+    isLoading, 
+    connectedCount,
+    connectIntegration,
+    disconnectIntegration,
+  } = useIntegrations();
 
-  const filteredIntegrations = integrations.filter((integration) => {
+  const filteredIntegrations = allIntegrations.filter((integration) => {
     const matchesSearch = 
       integration.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       integration.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -187,42 +69,44 @@ const Integrations = () => {
   const handleConnect = async () => {
     if (!selectedIntegration) return;
     
-    setIsConnecting(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setConnectedIntegrations([...connectedIntegrations, selectedIntegration.id]);
-    setIsConnecting(false);
-    setSelectedIntegration(null);
-    
-    toast({
-      title: "Integration connected",
-      description: `${selectedIntegration.name} has been connected successfully`,
+    await connectIntegration.mutateAsync({
+      integrationType: selectedIntegration.type,
+      name: selectedIntegration.name,
+      config: {},
+      credentials: {},
     });
+    
+    setSelectedIntegration(null);
   };
 
-  const handleDisconnect = (id: string) => {
-    setConnectedIntegrations(connectedIntegrations.filter(i => i !== id));
-    toast({
-      title: "Integration disconnected",
-      description: "The integration has been removed",
-    });
+  const handleDisconnect = async (integrationId: string) => {
+    await disconnectIntegration.mutateAsync(integrationId);
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Integrations" subtitle="Connect your favorite tools and automate your workflows">
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-full max-w-md" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
-    <DashboardLayout
-      title="Integrations"
-      subtitle="Connect your favorite tools and automate your workflows"
-    >
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="space-y-6"
-      >
+    <DashboardLayout title="Integrations" subtitle="Connect your favorite tools and automate your workflows">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         {/* Header with Help */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <IntegrationsContextualHelp />
           <IntegrationsPageHelp />
         </div>
+
         {/* Search and Categories */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
@@ -234,6 +118,9 @@ const Integrations = () => {
               className="pl-10"
             />
           </div>
+          <Badge variant="secondary" className="self-start px-3 py-1.5">
+            {connectedCount} Connected
+          </Badge>
         </div>
 
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -255,32 +142,32 @@ const Integrations = () => {
 
           <TabsContent value={selectedCategory} className="mt-6">
             {/* Connected Integrations */}
-            {connectedIntegrations.length > 0 && selectedCategory === "all" && (
+            {allIntegrations.filter(i => i.isConnected).length > 0 && selectedCategory === "all" && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Check className="w-5 h-5 text-green-500" />
                   Connected Integrations
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {integrations
-                    .filter(i => connectedIntegrations.includes(i.id))
+                  {allIntegrations
+                    .filter(i => i.isConnected)
                     .map((integration, index) => (
                       <motion.div
-                        key={integration.id}
+                        key={integration.type}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <Card className="border-green-200 bg-green-50/50">
+                        <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl shadow-sm">
+                                <div className="w-12 h-12 rounded-xl bg-white dark:bg-background flex items-center justify-center text-2xl shadow-sm">
                                   {integration.icon}
                                 </div>
                                 <div>
                                   <h4 className="font-semibold">{integration.name}</h4>
-                                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                     Connected
                                   </Badge>
                                 </div>
@@ -288,7 +175,7 @@ const Integrations = () => {
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                onClick={() => handleDisconnect(integration.id)}
+                                onClick={() => integration.dbRecord && handleDisconnect(integration.dbRecord.id)}
                               >
                                 Disconnect
                               </Button>
@@ -308,19 +195,19 @@ const Integrations = () => {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredIntegrations
-                  .filter(i => !connectedIntegrations.includes(i.id))
+                  .filter(i => !i.isConnected)
                   .map((integration, index) => (
                     <motion.div
-                      key={integration.id}
+                      key={integration.type}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
                     >
                       <Card 
                         className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${
-                          integration.status === "coming_soon" ? "opacity-60" : ""
+                          integration.comingSoon ? "opacity-60" : ""
                         }`}
-                        onClick={() => integration.status !== "coming_soon" && setSelectedIntegration(integration)}
+                        onClick={() => !integration.comingSoon && setSelectedIntegration(integration)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
@@ -337,7 +224,7 @@ const Integrations = () => {
                               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                 {integration.description}
                               </p>
-                              {integration.status === "coming_soon" && (
+                              {integration.comingSoon && (
                                 <Badge variant="secondary" className="mt-2">Coming Soon</Badge>
                               )}
                             </div>
@@ -420,8 +307,8 @@ const Integrations = () => {
                 <Button variant="outline" onClick={() => setSelectedIntegration(null)}>
                   Cancel
                 </Button>
-                <Button onClick={handleConnect} disabled={isConnecting}>
-                  {isConnecting ? (
+                <Button onClick={handleConnect} disabled={connectIntegration.isPending}>
+                  {connectIntegration.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Connecting...

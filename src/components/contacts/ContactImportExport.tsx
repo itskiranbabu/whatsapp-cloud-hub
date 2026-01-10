@@ -363,13 +363,28 @@ export const ContactImportExport = ({
                   or click to browse
                 </p>
               </div>
-              <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm font-medium mb-2">CSV Format Tips:</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Include headers in the first row</li>
-                  <li>• Phone numbers should include country code</li>
-                  <li>• Multiple tags can be separated by semicolons</li>
-                </ul>
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium mb-1">Need a template?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Download our CSV template with the correct format
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const link = document.createElement("a");
+                    link.href = "/templates/contacts_import_template.csv";
+                    link.download = "contacts_import_template.csv";
+                    link.click();
+                  }}
+                  className="gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </Button>
               </div>
             </div>
           )}
