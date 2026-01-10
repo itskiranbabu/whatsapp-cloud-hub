@@ -24,7 +24,9 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Integrations from "./pages/Integrations";
 import AdsManager from "./pages/AdsManager";
+import HelpCenter from "./pages/HelpCenter";
 import NotFound from "./pages/NotFound";
+import { AIAssistant } from "@/components/help/AIAssistant";
 
 // Create QueryClient inside the module scope but ensure it's stable
 const queryClient = new QueryClient({
