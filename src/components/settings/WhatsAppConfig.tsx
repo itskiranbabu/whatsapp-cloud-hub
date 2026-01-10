@@ -59,12 +59,26 @@ interface BSPConfig {
 
 const bspProviders: BSPConfig[] = [
   {
+    id: "meta_direct",
+    name: "Meta Direct (Recommended)",
+    logo: "🔵",
+    description: "FREE webhooks, 0% markup, direct Meta pricing - Best value!",
+    docsUrl: "https://developers.facebook.com/docs/whatsapp/cloud-api",
+    recommended: true,
+    fields: [
+      { key: "phone_number_id", label: "Phone Number ID", placeholder: "Your phone number ID from Meta", type: "text", helpText: "Found in Meta Business Suite → WhatsApp Manager" },
+      { key: "waba_id", label: "WABA ID", placeholder: "WhatsApp Business Account ID", type: "text", helpText: "Your WhatsApp Business Account ID" },
+      { key: "access_token", label: "Permanent Access Token", placeholder: "Your system user access token", type: "password", helpText: "Generate from Meta Business Settings → System Users" },
+      { key: "app_secret", label: "App Secret (Optional)", placeholder: "For webhook signature verification", type: "password", helpText: "Found in Meta App Dashboard → Settings → Basic" },
+      { key: "webhook_verify_token", label: "Webhook Verify Token", placeholder: "Create your own secret token", type: "password", helpText: "Any secret string you create for webhook verification" },
+    ],
+  },
+  {
     id: "aisensy",
     name: "AiSensy",
     logo: "🟢",
     description: "Official WhatsApp Business API partner with smart automation",
     docsUrl: "https://docs.aisensy.com/",
-    recommended: true,
     fields: [
       { key: "api_key", label: "API Key", placeholder: "Your AiSensy API Key", type: "password", helpText: "Get this from AiSensy Dashboard → Settings → API" },
     ],
@@ -105,19 +119,6 @@ const bspProviders: BSPConfig[] = [
       { key: "source_number", label: "Source Number", placeholder: "+1234567890", type: "text" },
     ],
   },
-  {
-    id: "meta_direct",
-    name: "Meta Direct",
-    logo: "🔵",
-    description: "Direct integration with Meta's WhatsApp Cloud API",
-    docsUrl: "https://developers.facebook.com/docs/whatsapp/cloud-api",
-    fields: [
-      { key: "access_token", label: "Permanent Access Token", placeholder: "Your access token", type: "password" },
-      { key: "phone_number_id", label: "Phone Number ID", placeholder: "Your phone number ID", type: "text" },
-      { key: "waba_id", label: "WABA ID", placeholder: "WhatsApp Business Account ID", type: "text" },
-      { key: "webhook_verify_token", label: "Webhook Verify Token", placeholder: "Your verify token", type: "password" },
-    ],
-  },
 ];
 
 const webhookSetupSteps = [
@@ -154,12 +155,23 @@ export const WhatsAppConfig = () => {
   const [webhookCopied, setWebhookCopied] = useState(false);
   const { toast } = useToast();
 
-  // Connection status
+  // Connection status - check for Meta Direct or BSP
   const isConnected = !!currentTenant?.phone_number_id;
-  const connectedProvider = currentTenant?.waba_id ? "aisensy" : null;
+  const tenantData = currentTenant as any;
+  const connectedProvider = tenantData?.bsp_provider || (currentTenant?.waba_id ? "meta_direct" : null);
 
-  // Generate webhook URL
-  const webhookUrl = `https://ceqbmtlxjszrpgjimpge.supabase.co/functions/v1/whatsapp-webhook?provider=${connectedProvider || 'aisensy'}&tenant=${currentTenant?.id || 'YOUR_TENANT_ID'}`;
+  // Generate webhook URL based on provider
+  const getWebhookUrl = () => {
+    const baseUrl = 'https://ceqbmtlxjszrpgjimpge.supabase.co/functions/v1';
+    const tenantParam = currentTenant?.id || 'YOUR_TENANT_ID';
+    
+    if (connectedProvider === 'meta_direct') {
+      return `${baseUrl}/whatsapp-meta-webhook?tenant=${tenantParam}`;
+    }
+    return `${baseUrl}/whatsapp-webhook?provider=${connectedProvider || 'meta_direct'}&tenant=${tenantParam}`;
+  };
+  
+  const webhookUrl = getWebhookUrl();
 
   const handleSave = async () => {
     if (!selectedProvider) return;
@@ -453,6 +465,28 @@ export const WhatsAppConfig = () => {
 
               {/* Provider-specific webhook guides */}
               <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="meta_direct">
+                  <AccordionTrigger className="text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🔵</span>
+                      Meta Direct Webhook Setup (Recommended)
+                      <Badge className="ml-2 bg-green-100 text-green-700 text-xs">FREE</Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-3 text-sm">
+                    <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                      <li>Go to <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Meta Developers</a> → Your App → WhatsApp → Configuration</li>
+                      <li>In "Webhook" section, click <strong>Edit</strong></li>
+                      <li>Paste your webhook URL in the "Callback URL" field</li>
+                      <li>Enter the same "Verify Token" you configured in our app</li>
+                      <li>Click <strong>Verify and Save</strong></li>
+                      <li>Under "Webhook fields", subscribe to: <strong>messages</strong></li>
+                    </ol>
+                    <div className="p-3 rounded-lg bg-green-50 border border-green-200 mt-3">
+                      <p className="text-green-800 text-xs">💡 <strong>Pro tip:</strong> Meta Direct webhooks are completely FREE with no monthly limits!</p>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
                 <AccordionItem value="aisensy">
                   <AccordionTrigger className="text-left">
                     <div className="flex items-center gap-2">
@@ -461,6 +495,9 @@ export const WhatsAppConfig = () => {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-3 text-sm">
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 mb-3">
+                      <p className="text-amber-800 text-xs">⚠️ Webhook access requires AiSensy Pro plan (₹2,399+/month). Consider Meta Direct for FREE webhooks.</p>
+                    </div>
                     <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
                       <li>Login to your AiSensy Dashboard at <a href="https://app.aisensy.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">app.aisensy.com</a></li>
                       <li>Go to <strong>Settings → API & Webhooks</strong></li>
@@ -547,16 +584,93 @@ export const WhatsAppConfig = () => {
 
                   <Separator />
 
-                  {/* AiSensy Setup */}
+                  {/* Meta Direct Setup */}
+                  <section className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <span className="text-xl">🔵</span>
+                      Meta Direct Setup (Recommended)
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                        <p className="text-sm text-blue-800">
+                          <strong>Why Meta Direct?</strong> FREE webhooks, 0% message markup, pay only Meta's direct pricing. Full control and true white-labeling. Best value for your users!
+                        </p>
+                      </div>
+                      
+                      <div className="grid gap-3 text-sm">
+                        <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                          <div className="flex items-center gap-2 text-green-800">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <strong>FREE Webhook Access</strong> - No monthly fees (vs ₹2,399+/month for BSPs)
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                          <div className="flex items-center gap-2 text-green-800">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <strong>0% Message Markup</strong> - Pay only Meta's prices (vs 10-20% BSP markup)
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                          <div className="flex items-center gap-2 text-green-800">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <strong>100% White-Label</strong> - Your brand, your control
+                          </div>
+                        </div>
+                      </div>
+
+                      <ol className="space-y-4 mt-6">
+                        {[
+                          {
+                            title: "Create Meta Business Account",
+                            description: "Go to business.facebook.com and create or use existing Meta Business Account",
+                          },
+                          {
+                            title: "Create Meta App",
+                            description: "Visit developers.facebook.com → My Apps → Create App → Business → Add WhatsApp product",
+                          },
+                          {
+                            title: "Get Phone Number ID & WABA ID",
+                            description: "In WhatsApp → API Setup, copy your Phone Number ID and WhatsApp Business Account ID",
+                          },
+                          {
+                            title: "Generate Permanent Token",
+                            description: "Go to Business Settings → System Users → Create System User → Generate Token with whatsapp_business_messaging permission",
+                          },
+                          {
+                            title: "Configure Webhook",
+                            description: "In WhatsApp → Configuration → Webhook, paste your webhook URL and verify token. Subscribe to 'messages' field",
+                          },
+                          {
+                            title: "Connect in Our App",
+                            description: "Click 'Meta Direct' in Providers tab, paste your credentials, and you're ready!",
+                          },
+                        ].map((step, index) => (
+                          <li key={index} className="flex items-start gap-4">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <h4 className="font-medium">{step.title}</h4>
+                              <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </section>
+
+                  <Separator />
+
+                  {/* AiSensy Setup (Alternative) */}
                   <section className="space-y-4">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                       <span className="text-xl">🟢</span>
-                      AiSensy Setup (Recommended)
+                      AiSensy Setup (Alternative BSP)
                     </h3>
                     <div className="space-y-4">
-                      <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                        <p className="text-sm text-green-800">
-                          <strong>Why AiSensy?</strong> AiSensy is an official Meta Business Partner offering the easiest setup process with competitive pricing and built-in automation features.
+                      <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                        <p className="text-sm text-amber-800">
+                          <strong>Note:</strong> AiSensy requires paid plans for webhook access (₹2,399+/month). Consider Meta Direct for free webhooks.
                         </p>
                       </div>
                       
@@ -564,11 +678,11 @@ export const WhatsAppConfig = () => {
                         {[
                           {
                             title: "Create AiSensy Account",
-                            description: "Go to app.aisensy.com and sign up for a free account. Verify your email.",
+                            description: "Go to app.aisensy.com and sign up. Verify your email.",
                           },
                           {
                             title: "Connect WhatsApp Business",
-                            description: "Follow the guided setup to connect your Facebook Business and request a WhatsApp number.",
+                            description: "Follow guided setup to connect Facebook Business and request a WhatsApp number.",
                           },
                           {
                             title: "Get API Key",
@@ -577,14 +691,6 @@ export const WhatsAppConfig = () => {
                           {
                             title: "Configure in Our App",
                             description: "Click on AiSensy in the Providers tab and paste your API key.",
-                          },
-                          {
-                            title: "Setup Webhook",
-                            description: "Copy your webhook URL from the Webhook tab and paste it in AiSensy settings.",
-                          },
-                          {
-                            title: "Verify & Test",
-                            description: "Send a test message to verify everything is working correctly.",
                           },
                         ].map((step, index) => (
                           <li key={index} className="flex items-start gap-4">

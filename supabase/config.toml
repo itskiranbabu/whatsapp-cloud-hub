@@ -12,6 +12,15 @@ verify_jwt = false
 [functions.whatsapp-aisensy]
 verify_jwt = false
 
+[functions.whatsapp-meta-send]
+verify_jwt = false
+
+[functions.whatsapp-meta-webhook]
+verify_jwt = false
+
+[functions.whatsapp-meta-templates]
+verify_jwt = false
+
 [functions.ai-assistant]
 enabled = true
 verify_jwt = false

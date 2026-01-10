@@ -434,11 +434,16 @@ export type Database = {
       }
       tenants: {
         Row: {
+          bsp_credentials: Json | null
+          bsp_provider: string | null
           business_name: string | null
           created_at: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
+          meta_access_token: string | null
+          meta_app_secret: string | null
+          meta_webhook_verify_token: string | null
           muc_limit: number | null
           name: string
           phone_number_id: string | null
@@ -449,11 +454,16 @@ export type Database = {
           waba_id: string | null
         }
         Insert: {
+          bsp_credentials?: Json | null
+          bsp_provider?: string | null
           business_name?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          meta_access_token?: string | null
+          meta_app_secret?: string | null
+          meta_webhook_verify_token?: string | null
           muc_limit?: number | null
           name: string
           phone_number_id?: string | null
@@ -464,11 +474,16 @@ export type Database = {
           waba_id?: string | null
         }
         Update: {
+          bsp_credentials?: Json | null
+          bsp_provider?: string | null
           business_name?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          meta_access_token?: string | null
+          meta_app_secret?: string | null
+          meta_webhook_verify_token?: string | null
           muc_limit?: number | null
           name?: string
           phone_number_id?: string | null
