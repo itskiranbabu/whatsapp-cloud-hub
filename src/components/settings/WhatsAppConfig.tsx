@@ -42,10 +42,13 @@ import {
   Globe,
   ArrowRight,
   Info,
+  Calculator,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTenants } from "@/hooks/useTenants";
 import { supabase } from "@/integrations/supabase/client";
+import { MetaEmbeddedSignup } from "./MetaEmbeddedSignup";
+import { CostComparison } from "./CostComparison";
 
 interface BSPConfig {
   id: string;
@@ -249,8 +252,18 @@ export const WhatsAppConfig = () => {
 
   return (
     <div className="space-y-6">
+      {/* Meta Embedded Signup - Primary Option */}
+      <MetaEmbeddedSignup
+        onSuccess={(credentials) => {
+          console.log("Meta Direct connected:", credentials);
+        }}
+        onError={(error) => {
+          console.error("Meta Direct connection failed:", error);
+        }}
+      />
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="providers" className="gap-2">
             <Zap className="w-4 h-4" />
             Providers
@@ -259,11 +272,20 @@ export const WhatsAppConfig = () => {
             <Webhook className="w-4 h-4" />
             Webhook
           </TabsTrigger>
+          <TabsTrigger value="compare" className="gap-2">
+            <Calculator className="w-4 h-4" />
+            Compare
+          </TabsTrigger>
           <TabsTrigger value="guide" className="gap-2">
             <BookOpen className="w-4 h-4" />
             Guide
           </TabsTrigger>
         </TabsList>
+
+        {/* Cost Comparison Tab */}
+        <TabsContent value="compare" className="space-y-6">
+          <CostComparison />
+        </TabsContent>
 
         {/* Providers Tab */}
         <TabsContent value="providers" className="space-y-6">

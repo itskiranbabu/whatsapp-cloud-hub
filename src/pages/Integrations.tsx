@@ -32,7 +32,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
+import { IntegrationsPageHelp, IntegrationsContextualHelp } from "@/components/help/PageHelpComponents";
 interface Integration {
   id: string;
   name: string;
@@ -218,6 +218,11 @@ const Integrations = () => {
         animate={{ opacity: 1 }}
         className="space-y-6"
       >
+        {/* Header with Help */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <IntegrationsContextualHelp />
+          <IntegrationsPageHelp />
+        </div>
         {/* Search and Categories */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1 max-w-md">
