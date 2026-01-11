@@ -77,18 +77,53 @@ export const useConversations = () => {
     },
   });
 
+  // Create a new conversation with a contact
+  const createConversation = useMutation({
+    mutationFn: async ({ contactId }: { contactId: string }) => {
+      if (!currentTenant?.id) throw new Error("No tenant selected");
+
+      // Check if conversation already exists
+      const { data: existing } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("tenant_id", currentTenant.id)
+        .eq("contact_id", contactId)
+        .single();
+
+      if (existing) return existing;
+
+      const { data, error } = await supabase
+        .from("conversations")
+        .insert({
+          tenant_id: currentTenant.id,
+          contact_id: contactId,
+          status: "open",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations", currentTenant?.id] });
+    },
+  });
+
   return {
     conversations,
     isLoading,
     error,
     updateConversationStatus,
     assignAgent,
+    createConversation,
   };
 };
 
 export const useMessages = (conversationId: string | null) => {
   const { currentTenant } = useTenants();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const {
     data: messages = [],
@@ -125,6 +160,15 @@ export const useMessages = (conversationId: string | null) => {
     }) => {
       if (!currentTenant?.id) throw new Error("No tenant selected");
 
+      // Get contact phone number
+      const { data: contact } = await supabase
+        .from("contacts")
+        .select("phone")
+        .eq("id", contactId)
+        .single();
+
+      if (!contact) throw new Error("Contact not found");
+
       // Insert message into database
       const { data: message, error: messageError } = await supabase
         .from("messages")
@@ -142,16 +186,133 @@ export const useMessages = (conversationId: string | null) => {
 
       if (messageError) throw messageError;
 
-      // Call edge function to send via WhatsApp
-      const { error: sendError } = await supabase.functions.invoke("whatsapp-send", {
+      // Update conversation last_message_at
+      await supabase
+        .from("conversations")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", conversationId);
+
+      // Try to send via Meta Direct API first, fallback to BSP
+      try {
+        const { error: metaError } = await supabase.functions.invoke("whatsapp-meta-send", {
+          body: {
+            messageId: message.id,
+            tenantId: currentTenant.id,
+            to: contact.phone,
+            message: content,
+            messageType,
+          },
+        });
+
+        if (metaError) {
+          // Fallback to generic whatsapp-send
+          const { error: sendError } = await supabase.functions.invoke("whatsapp-send", {
+            body: {
+              messageId: message.id,
+              tenantId: currentTenant.id,
+            },
+          });
+
+          if (sendError) throw sendError;
+        }
+      } catch (sendError: any) {
+        // Update message status to failed
+        await supabase
+          .from("messages")
+          .update({ status: "failed", failed_reason: sendError.message })
+          .eq("id", message.id);
+        
+        // Don't throw - message is saved, just not sent
+        console.error("Failed to send message:", sendError);
+      }
+
+      return message;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to send message",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send a template message
+  const sendTemplateMessage = useMutation({
+    mutationFn: async ({
+      conversationId,
+      contactId,
+      templateId,
+      variables = {},
+    }: {
+      conversationId: string;
+      contactId: string;
+      templateId: string;
+      variables?: Record<string, string>;
+    }) => {
+      if (!currentTenant?.id) throw new Error("No tenant selected");
+
+      // Get template
+      const { data: template } = await supabase
+        .from("templates")
+        .select("*")
+        .eq("id", templateId)
+        .single();
+
+      if (!template) throw new Error("Template not found");
+
+      // Get contact
+      const { data: contact } = await supabase
+        .from("contacts")
+        .select("phone, name")
+        .eq("id", contactId)
+        .single();
+
+      if (!contact) throw new Error("Contact not found");
+
+      // Replace variables in template body
+      let content = template.body;
+      Object.entries(variables).forEach(([key, value]) => {
+        content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+      });
+      // Replace common variables
+      content = content.replace(/\{\{name\}\}/g, contact.name || "");
+      content = content.replace(/\{\{phone\}\}/g, contact.phone);
+
+      // Insert message
+      const { data: message, error: messageError } = await supabase
+        .from("messages")
+        .insert({
+          tenant_id: currentTenant.id,
+          conversation_id: conversationId,
+          contact_id: contactId,
+          direction: "outbound" as const,
+          content,
+          message_type: "template",
+          status: "pending" as const,
+        })
+        .select()
+        .single();
+
+      if (messageError) throw messageError;
+
+      // Send via Meta API
+      const { error: sendError } = await supabase.functions.invoke("whatsapp-meta-send", {
         body: {
           messageId: message.id,
           tenantId: currentTenant.id,
+          to: contact.phone,
+          templateName: template.name,
+          templateLanguage: template.language || "en",
+          variables: Object.values(variables),
         },
       });
 
       if (sendError) {
-        // Update message status to failed
         await supabase
           .from("messages")
           .update({ status: "failed", failed_reason: sendError.message })
@@ -164,6 +325,14 @@ export const useMessages = (conversationId: string | null) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      toast({ title: "Template message sent successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to send template message",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -172,5 +341,6 @@ export const useMessages = (conversationId: string | null) => {
     isLoading,
     error,
     sendMessage,
+    sendTemplateMessage,
   };
 };
