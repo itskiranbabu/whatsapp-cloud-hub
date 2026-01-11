@@ -38,14 +38,7 @@ import { ContextualHelp } from "@/components/help/ContextualHelp";
 import { useAutomations } from "@/hooks/useAutomations";
 import { useToast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
-
-interface FlowNode {
-  id: string;
-  type: "trigger" | "message" | "condition" | "delay" | "action";
-  title: string;
-  config: Record<string, unknown>;
-  position: number;
-}
+import type { FlowNode } from "@/components/automation/FlowBuilder";
 
 const Automation = () => {
   const { automations, isLoading, createAutomation, updateAutomation, toggleAutomation, deleteAutomation } = useAutomations();
