@@ -107,7 +107,15 @@ const Templates = () => {
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
   const [initialTemplateData, setInitialTemplateData] = useState<any>(null);
 
-  const { templates, isLoading, createTemplate, deleteTemplate, stats } = useTemplates();
+  const { templates, isLoading, createTemplate, deleteTemplate, stats, syncTemplates } = useTemplates();
+
+  const handleSyncTemplates = async () => {
+    try {
+      await syncTemplates.mutateAsync();
+    } catch (error) {
+      console.error("Failed to sync templates:", error);
+    }
+  };
 
   const filteredTemplates = templates.filter((template) => {
     const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -305,9 +313,14 @@ const Templates = () => {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
-              <RefreshCw className="w-4 h-4" />
-              Sync Status
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={handleSyncTemplates}
+              disabled={syncTemplates.isPending}
+            >
+              <RefreshCw className={`w-4 h-4 ${syncTemplates.isPending ? 'animate-spin' : ''}`} />
+              {syncTemplates.isPending ? 'Syncing...' : 'Sync from Meta'}
             </Button>
             <Button className="btn-whatsapp gap-2" onClick={() => setShowCreateMode(true)}>
               <Plus className="w-4 h-4" />
