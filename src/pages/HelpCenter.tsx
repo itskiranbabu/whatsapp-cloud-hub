@@ -32,6 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { VideoTutorials } from "@/components/help/VideoTutorials";
 
 interface Article {
   id: string;
@@ -423,27 +424,7 @@ const HelpCenter = () => {
           </TabsContent>
 
           <TabsContent value="videos" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {videoTutorials.map((video) => (
-                <Card
-                  key={video.id}
-                  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30 overflow-hidden"
-                >
-                  <div className="aspect-video bg-muted flex items-center justify-center relative">
-                    <PlayCircle className="h-12 w-12 text-primary" />
-                    <Badge className="absolute bottom-2 right-2 bg-black/70 text-white">
-                      {video.duration}
-                    </Badge>
-                  </div>
-                  <CardContent className="p-4">
-                    <h4 className="font-medium mb-1">{video.title}</h4>
-                    <Badge variant="outline" className="text-xs">
-                      {categories.find((c) => c.id === video.category)?.label}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <VideoTutorials />
           </TabsContent>
 
           <TabsContent value="faq" className="space-y-6">
