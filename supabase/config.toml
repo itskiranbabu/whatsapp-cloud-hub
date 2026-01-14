@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.bootstrap-tenant]
 verify_jwt = false
+
+[functions.automation-engine]
+verify_jwt = false

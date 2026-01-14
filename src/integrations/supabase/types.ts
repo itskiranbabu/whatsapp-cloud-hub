@@ -79,6 +79,122 @@ export type Database = {
           },
         ]
       }
+      affiliates: {
+        Row: {
+          commission_rate: number | null
+          created_at: string
+          id: string
+          payout_details: Json | null
+          pending_payout: number | null
+          referral_code: string
+          status: string | null
+          total_earnings: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          commission_rate?: number | null
+          created_at?: string
+          id?: string
+          payout_details?: Json | null
+          pending_payout?: number | null
+          referral_code: string
+          status?: string | null
+          total_earnings?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          commission_rate?: number | null
+          created_at?: string
+          id?: string
+          payout_details?: Json | null
+          pending_payout?: number | null
+          referral_code?: string
+          status?: string | null
+          total_earnings?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      automation_executions: {
+        Row: {
+          automation_id: string
+          completed_at: string | null
+          contact_id: string | null
+          conversation_id: string | null
+          created_at: string
+          current_node_id: string | null
+          error_message: string | null
+          execution_path: Json | null
+          id: string
+          started_at: string | null
+          status: string | null
+          tenant_id: string
+          trigger_data: Json | null
+        }
+        Insert: {
+          automation_id: string
+          completed_at?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          current_node_id?: string | null
+          error_message?: string | null
+          execution_path?: Json | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          tenant_id: string
+          trigger_data?: Json | null
+        }
+        Update: {
+          automation_id?: string
+          completed_at?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          current_node_id?: string | null
+          error_message?: string | null
+          execution_path?: Json | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          tenant_id?: string
+          trigger_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_executions_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_executions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automations: {
         Row: {
           created_at: string | null
@@ -130,6 +246,66 @@ export type Database = {
             foreignKeyName: "automations_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_accounts: {
+        Row: {
+          billing_cycle: string | null
+          created_at: string
+          credits_balance: number | null
+          id: string
+          next_billing_date: string | null
+          partner_id: string | null
+          payment_method: Json | null
+          plan_id: string
+          razorpay_customer_id: string | null
+          razorpay_subscription_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          billing_cycle?: string | null
+          created_at?: string
+          credits_balance?: number | null
+          id?: string
+          next_billing_date?: string | null
+          partner_id?: string | null
+          payment_method?: Json | null
+          plan_id?: string
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          billing_cycle?: string | null
+          created_at?: string
+          credits_balance?: number | null
+          id?: string
+          next_billing_date?: string | null
+          partner_id?: string | null
+          payment_method?: Json | null
+          plan_id?: string
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_accounts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -207,6 +383,70 @@ export type Database = {
           {
             foreignKeyName: "campaigns_tenant_id_fkey"
             columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commissions: {
+        Row: {
+          affiliate_id: string | null
+          amount: number
+          created_at: string
+          id: string
+          paid_at: string | null
+          partner_id: string | null
+          period_end: string | null
+          period_start: string | null
+          source_tenant_id: string | null
+          status: string | null
+          type: string
+        }
+        Insert: {
+          affiliate_id?: string | null
+          amount: number
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          partner_id?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          source_tenant_id?: string | null
+          status?: string | null
+          type: string
+        }
+        Update: {
+          affiliate_id?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          partner_id?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          source_tenant_id?: string | null
+          status?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_source_tenant_id_fkey"
+            columns: ["source_tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
@@ -449,6 +689,114 @@ export type Database = {
           },
         ]
       }
+      partners: {
+        Row: {
+          branding: Json | null
+          commission_rate: number | null
+          created_at: string
+          custom_domain: string | null
+          id: string
+          name: string
+          onboarded_at: string | null
+          owner_user_id: string
+          payout_details: Json | null
+          revenue_share_model: string | null
+          slug: string
+          status: string | null
+          total_clients: number | null
+          total_revenue: number | null
+          updated_at: string
+        }
+        Insert: {
+          branding?: Json | null
+          commission_rate?: number | null
+          created_at?: string
+          custom_domain?: string | null
+          id?: string
+          name: string
+          onboarded_at?: string | null
+          owner_user_id: string
+          payout_details?: Json | null
+          revenue_share_model?: string | null
+          slug: string
+          status?: string | null
+          total_clients?: number | null
+          total_revenue?: number | null
+          updated_at?: string
+        }
+        Update: {
+          branding?: Json | null
+          commission_rate?: number | null
+          created_at?: string
+          custom_domain?: string | null
+          id?: string
+          name?: string
+          onboarded_at?: string | null
+          owner_user_id?: string
+          payout_details?: Json | null
+          revenue_share_model?: string | null
+          slug?: string
+          status?: string | null
+          total_clients?: number | null
+          total_revenue?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payouts: {
+        Row: {
+          affiliate_id: string | null
+          amount: number
+          created_at: string
+          id: string
+          partner_id: string | null
+          payout_details: Json | null
+          processed_at: string | null
+          razorpay_payout_id: string | null
+          requested_at: string | null
+          status: string | null
+        }
+        Insert: {
+          affiliate_id?: string | null
+          amount: number
+          created_at?: string
+          id?: string
+          partner_id?: string | null
+          payout_details?: Json | null
+          processed_at?: string | null
+          razorpay_payout_id?: string | null
+          requested_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          affiliate_id?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          partner_id?: string | null
+          payout_details?: Json | null
+          processed_at?: string | null
+          razorpay_payout_id?: string | null
+          requested_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -481,6 +829,48 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      referrals: {
+        Row: {
+          affiliate_id: string
+          converted_at: string | null
+          created_at: string
+          id: string
+          referred_tenant_id: string
+          status: string | null
+        }
+        Insert: {
+          affiliate_id: string
+          converted_at?: string | null
+          created_at?: string
+          id?: string
+          referred_tenant_id: string
+          status?: string | null
+        }
+        Update: {
+          affiliate_id?: string
+          converted_at?: string | null
+          created_at?: string
+          id?: string
+          referred_tenant_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_tenant_id_fkey"
+            columns: ["referred_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       templates: {
         Row: {
@@ -542,6 +932,42 @@ export type Database = {
             foreignKeyName: "templates_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_partners: {
+        Row: {
+          created_at: string
+          id: string
+          partner_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          partner_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          partner_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_partners_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_partners_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -609,6 +1035,41 @@ export type Database = {
           waba_id?: string | null
         }
         Relationships: []
+      }
+      usage_logs: {
+        Row: {
+          created_at: string
+          credits_used: number | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_used?: number | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_used?: number | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
