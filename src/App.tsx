@@ -26,6 +26,8 @@ import Contact from "./pages/Contact";
 import Integrations from "./pages/Integrations";
 import AdsManager from "./pages/AdsManager";
 import HelpCenter from "./pages/HelpCenter";
+import Partners from "./pages/Partners";
+import Affiliates from "./pages/Affiliates";
 import NotFound from "./pages/NotFound";
 import { AIAssistant } from "@/components/help/AIAssistant";
 
@@ -149,6 +151,22 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <AdsManager />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/partners"
+                element={
+                  <ProtectedRoute>
+                    <Partners />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/affiliates"
+                element={
+                  <ProtectedRoute>
+                    <Affiliates />
                   </ProtectedRoute>
                 }
               />

@@ -19,6 +19,8 @@ import {
   ChevronsUpDown,
   Puzzle,
   Megaphone,
+  Handshake,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +44,8 @@ const navigationItems = [
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Megaphone, label: "Ads Manager", path: "/ads" },
   { icon: Puzzle, label: "Integrations", path: "/integrations" },
+  { icon: Handshake, label: "Partners", path: "/partners" },
+  { icon: UserPlus, label: "Affiliates", path: "/affiliates" },
 ];
 
 const bottomItems = [

@@ -72,6 +72,15 @@ export function usePartners() {
   };
 }
 
+export interface Referral {
+  id: string;
+  affiliate_id: string;
+  referred_tenant_id: string;
+  status: string | null;
+  converted_at: string | null;
+  created_at: string;
+}
+
 export function useAffiliates() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -82,6 +91,15 @@ export function useAffiliates() {
       const { data, error } = await supabase.from("affiliates").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return data as Affiliate[];
+    },
+  });
+
+  const referralsQuery = useQuery({
+    queryKey: ["referrals"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("referrals").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Referral[];
     },
   });
 
@@ -100,7 +118,8 @@ export function useAffiliates() {
 
   return {
     affiliates: affiliatesQuery.data || [],
-    isLoading: affiliatesQuery.isLoading,
+    referrals: referralsQuery.data || [],
+    isLoading: affiliatesQuery.isLoading || referralsQuery.isLoading,
     createAffiliate: createAffiliateMutation.mutate,
     isCreating: createAffiliateMutation.isPending,
   };
