@@ -53,8 +53,8 @@ WhatsFlow is a **multi-tenant WhatsApp Business API White-Label SaaS Platform** 
 | **Partner Database Tables** | ✅ Complete | High |
 | **Partner Portal UI** | ✅ Complete | High |
 | **Affiliate Dashboard** | ✅ Complete | High |
+| **Custom Domain Routing** | ✅ Complete | Medium |
 | **Razorpay Payment Gateway** | 🔄 Deferred | Medium |
-| **Custom Domain Routing** | 🔄 Not Started | Medium |
 | **Video Tutorial Content** | 🔄 Infrastructure Ready | Low |
 
 ---
@@ -602,7 +602,7 @@ WITH CHECK (
 |------|----------|--------|
 | Partner database tables | High | ✅ Complete |
 | Partner portal UI | High | ✅ Complete |
-| Custom domain routing | Medium | 🔄 In Progress |
+| Custom domain routing | Medium | ✅ Complete |
 | Branding customization engine | Medium | ✅ Complete |
 | Revenue tracking dashboard | Medium | ✅ Complete |
 | Affiliate program | Medium | ✅ Complete |
