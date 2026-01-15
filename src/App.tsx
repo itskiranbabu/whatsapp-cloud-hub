@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { PartnerProvider } from "@/contexts/PartnerContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
@@ -49,6 +50,7 @@ const App: React.FC = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <PartnerProvider>
             <AuthProvider>
             <Routes>
               <Route path="/" element={<Landing />} />
@@ -174,6 +176,7 @@ const App: React.FC = () => {
             </Routes>
             <AIAssistant />
             </AuthProvider>
+            </PartnerProvider>
           </BrowserRouter>
         </TooltipProvider>
       </LanguageProvider>

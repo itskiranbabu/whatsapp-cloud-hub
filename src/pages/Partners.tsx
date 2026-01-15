@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePartners, useAffiliates, useCommissions, usePayouts } from "@/hooks/usePartners";
+import { CustomDomainSetup } from "@/components/partners/CustomDomainSetup";
+import { PartnerBrandingSettings } from "@/components/partners/PartnerBrandingSettings";
 import { 
   Building2, 
   Users, 
@@ -20,7 +22,8 @@ import {
   Wallet,
   UserPlus,
   Link,
-  Percent
+  Percent,
+  Palette
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Partners() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isCreatePartnerOpen, setIsCreatePartnerOpen] = useState(false);
+  const [selectedPartnerForBranding, setSelectedPartnerForBranding] = useState<string | null>(null);
   const [newPartner, setNewPartner] = useState({ name: "", slug: "", custom_domain: "", revenue_share_model: "markup" });
   
   const { partners, isLoading: partnersLoading, createPartner, isCreating } = usePartners();
@@ -59,7 +63,7 @@ export default function Partners() {
   return (
     <DashboardLayout title="Partner & Affiliate Portal" subtitle="Manage white-label partners and affiliate program">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Overview
@@ -67,6 +71,10 @@ export default function Partners() {
           <TabsTrigger value="partners" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             Partners
+          </TabsTrigger>
+          <TabsTrigger value="branding" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            Branding
           </TabsTrigger>
           <TabsTrigger value="affiliates" className="flex items-center gap-2">
             <Link className="h-4 w-4" />
@@ -315,6 +323,72 @@ export default function Partners() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="branding" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">White-Label Branding</h3>
+              <p className="text-sm text-muted-foreground">Customize domain and branding for your white-label instance</p>
+            </div>
+            {partners.length > 1 && (
+              <Select 
+                value={selectedPartnerForBranding || partners[0]?.id} 
+                onValueChange={setSelectedPartnerForBranding}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select partner" />
+                </SelectTrigger>
+                <SelectContent>
+                  {partners.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {partnersLoading ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">Loading...</p>
+              </CardContent>
+            </Card>
+          ) : partners.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Palette className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-semibold mb-2">No Partners Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create a partner first to configure branding and custom domains
+                </p>
+                <Button onClick={() => { setActiveTab("partners"); setIsCreatePartnerOpen(true); }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Partner
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {(() => {
+                const partner = partners.find(p => p.id === (selectedPartnerForBranding || partners[0]?.id));
+                if (!partner) return null;
+                return (
+                  <>
+                    <CustomDomainSetup 
+                      partnerId={partner.id}
+                      partnerSlug={partner.slug}
+                      currentDomain={partner.custom_domain}
+                    />
+                    <PartnerBrandingSettings 
+                      partnerId={partner.id}
+                      currentBranding={partner.branding}
+                    />
+                  </>
+                );
+              })()}
             </div>
           )}
         </TabsContent>
