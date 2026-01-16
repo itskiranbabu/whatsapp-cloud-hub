@@ -66,7 +66,7 @@ const Inbox = () => {
   // Presence tracking for selected conversation
   const { contactPresence } = useSimulatedPresence(selectedConversation?.id || null);
   
-  const { messages, isLoading: messagesLoading, sendMessage } = useMessages(
+  const { messages, isLoading: messagesLoading, sendMessage, refetch: refetchMessages } = useMessages(
     selectedConversation?.id || null
   );
 
@@ -91,13 +91,15 @@ const Inbox = () => {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
           schema: "public",
           table: "messages",
           filter: `conversation_id=eq.${selectedConversation.id}`,
         },
         (payload) => {
-          console.log("New message received:", payload);
+          console.log("Real-time message event:", payload);
+          // Refetch messages to get latest data
+          refetchMessages();
         }
       )
       .subscribe();
@@ -105,7 +107,7 @@ const Inbox = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedConversation?.id]);
+  }, [selectedConversation?.id, refetchMessages]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

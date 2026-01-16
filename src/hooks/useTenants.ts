@@ -1,22 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 
-export interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
-  logo_url: string | null;
-  primary_color: string | null;
-  business_name: string | null;
-  is_active: boolean | null;
-  plan: string | null;
-  muc_limit: number | null;
-  created_at: string | null;
-  updated_at: string | null;
-  phone_number_id: string | null;
-  waba_id: string | null;
-}
+export type Tenant = Tables<"tenants">;
+export type TenantInsert = TablesInsert<"tenants">;
 
 export const useTenants = () => {
   const { user, currentTenantId, setCurrentTenantId, isSuperAdmin } = useAuth();
@@ -54,7 +42,7 @@ export const useTenants = () => {
 
   const currentTenant = tenants.find((t) => t.id === currentTenantId) || null;
 
-  const createTenant = async (tenantData: { name: string; slug: string } & Partial<Omit<Tenant, 'name' | 'slug'>>) => {
+  const createTenant = async (tenantData: TenantInsert) => {
     const { data, error } = await supabase
       .from('tenants')
       .insert([tenantData])

@@ -349,6 +349,67 @@ serve(async (req) => {
                 .from('contacts')
                 .update({ last_message_at: new Date().toISOString() })
                 .eq('id', contact.id);
+
+              // ============ AUTOMATION TRIGGER ============
+              // Check for keyword-based automations on incoming messages
+              if (content) {
+                try {
+                  const automationResponse = await fetch(
+                    `${supabaseUrl}/functions/v1/automation-engine`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${supabaseServiceKey}`,
+                      },
+                      body: JSON.stringify({
+                        action: 'trigger_match',
+                        tenant_id: resolvedTenantId,
+                        trigger_data: {
+                          message_content: content,
+                          contact_phone: senderPhone,
+                          contact_name: senderName,
+                        },
+                      }),
+                    }
+                  );
+
+                  const automationResult = await automationResponse.json();
+                  console.log('Automation trigger check:', automationResult);
+
+                  // Execute matched automations
+                  if (automationResult.matched_automations?.length > 0) {
+                    for (const automationId of automationResult.matched_automations) {
+                      await fetch(
+                        `${supabaseUrl}/functions/v1/automation-engine`,
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${supabaseServiceKey}`,
+                          },
+                          body: JSON.stringify({
+                            action: 'execute',
+                            automation_id: automationId,
+                            tenant_id: resolvedTenantId,
+                            conversation_id: conversation.id,
+                            contact_id: contact.id,
+                            trigger_data: {
+                              message_content: content,
+                              contact_phone: senderPhone,
+                              contact_name: senderName,
+                            },
+                          }),
+                        }
+                      );
+                    }
+                  }
+                } catch (automationError) {
+                  console.error('Automation trigger error:', automationError);
+                  // Don't fail the webhook for automation errors
+                }
+              }
+              // ============ END AUTOMATION TRIGGER ============
             }
           }
         }
