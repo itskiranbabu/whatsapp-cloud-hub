@@ -90,11 +90,16 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
 
     // Initialize FB SDK when it loads
     window.fbAsyncInit = function () {
+      // Get Meta App ID from environment or use fallback for demo
+      const metaAppId = import.meta.env.VITE_META_APP_ID;
+      if (!metaAppId) {
+        console.warn('Meta App ID not configured. Please add VITE_META_APP_ID secret.');
+      }
       window.FB.init({
-        appId: import.meta.env.VITE_META_APP_ID || "YOUR_META_APP_ID",
+        appId: metaAppId || "YOUR_META_APP_ID",
         cookie: true,
         xfbml: true,
-        version: "v19.0",
+        version: "v21.0",
       });
       window.FB.AppEvents.logPageView();
       setIsSDKLoaded(true);
@@ -189,7 +194,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
           response_type: "code",
           override_default_response_type: true,
           extras: {
-            sessionInfoVersion: 2,
+            sessionInfoVersion: 3,
             featureType: "only_waba_sharing",
             setup: {},
           },
