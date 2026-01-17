@@ -28,8 +28,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -37,6 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Plus,
   Search,
@@ -55,22 +55,42 @@ import {
   Wallet,
   Loader2,
   ArrowUpRight,
-  ArrowDownRight,
+  RefreshCw,
+  Link2,
+  Unlink,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
+import { useMetaAds } from "@/hooks/useMetaAds";
 import { useAds } from "@/hooks/useAds";
-import { useTenants } from "@/hooks/useTenants";
 import { format } from "date-fns";
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string }> = {
   active: { label: "Active", color: "bg-green-100 text-green-700" },
+  ACTIVE: { label: "Active", color: "bg-green-100 text-green-700" },
   paused: { label: "Paused", color: "bg-amber-100 text-amber-700" },
+  PAUSED: { label: "Paused", color: "bg-amber-100 text-amber-700" },
   completed: { label: "Completed", color: "bg-gray-100 text-gray-700" },
   draft: { label: "Draft", color: "bg-blue-100 text-blue-700" },
 };
 
 const AdsManager = () => {
-  const { ads, isLoading, stats, createAd, deleteAd, toggleAdStatus } = useAds();
-  const { currentTenant } = useTenants();
+  const { 
+    isConnected, 
+    isLoading: isMetaLoading, 
+    isFBSDKLoaded,
+    adAccounts,
+    campaigns: metaCampaigns,
+    selectedAdAccount,
+    setSelectedAdAccount,
+    connectMeta,
+    disconnectMeta,
+    syncCampaigns,
+    createCampaign,
+  } = useMetaAds();
+  
+  const { ads, isLoading: isAdsLoading, stats, createAd, deleteAd, toggleAdStatus } = useAds();
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
@@ -82,8 +102,7 @@ const AdsManager = () => {
     objective: "",
   });
 
-  // Check if Meta is connected via tenant settings
-  const isConnected = !!currentTenant?.waba_id;
+  const isLoading = isMetaLoading || isAdsLoading;
 
   const filteredAds = ads.filter(ad =>
     ad.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -91,22 +110,45 @@ const AdsManager = () => {
 
   const handleConnect = async () => {
     setIsConnecting(true);
-    // This would redirect to Meta OAuth in production
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      await connectMeta();
+      setShowConnectDialog(false);
+    } catch (error) {
+      console.error("Failed to connect:", error);
+    }
     setIsConnecting(false);
-    setShowConnectDialog(false);
-    // Would update tenant with Meta credentials
+  };
+
+  const handleDisconnect = async () => {
+    await disconnectMeta.mutateAsync();
+  };
+
+  const handleSync = async () => {
+    if (selectedAdAccount) {
+      await syncCampaigns.mutateAsync(selectedAdAccount);
+    }
   };
 
   const handleCreateAd = async () => {
     if (!newAd.name.trim()) return;
     
-    await createAd.mutateAsync({
-      name: newAd.name,
-      platform: newAd.platform,
-      budget: parseFloat(newAd.budget) || 0,
-      status: "draft",
-    });
+    // If connected to Meta, create on Meta first
+    if (isConnected && selectedAdAccount) {
+      await createCampaign.mutateAsync({
+        adAccountId: selectedAdAccount,
+        name: newAd.name,
+        objective: "MESSAGES",
+        status: "PAUSED",
+      });
+    } else {
+      // Otherwise create locally
+      await createAd.mutateAsync({
+        name: newAd.name,
+        platform: newAd.platform,
+        budget: parseFloat(newAd.budget) || 0,
+        status: "draft",
+      });
+    }
     
     setShowCreateDialog(false);
     setNewAd({ name: "", platform: "facebook", budget: "", objective: "" });
@@ -135,6 +177,7 @@ const AdsManager = () => {
     );
   }
 
+  // Not connected state
   if (!isConnected) {
     return (
       <DashboardLayout title="Ads Manager" subtitle="Create and manage Click-to-WhatsApp ads">
@@ -148,13 +191,30 @@ const AdsManager = () => {
           </div>
           <h2 className="text-2xl font-bold mb-2">Connect Meta Business</h2>
           <p className="text-muted-foreground text-center max-w-md mb-8">
-            Connect your Meta Business account to create and manage Click-to-WhatsApp ads directly from your dashboard
+            Connect your Meta Business account to create and manage Click-to-WhatsApp ads directly from your dashboard. 
+            Sync campaigns and track performance in real-time.
           </p>
-          <Button size="lg" onClick={() => setShowConnectDialog(true)} className="gap-2">
-            <Facebook className="w-5 h-5" />
-            Connect Facebook
-          </Button>
+          
+          <div className="flex flex-col items-center gap-4">
+            <Button 
+              size="lg" 
+              onClick={() => setShowConnectDialog(true)} 
+              className="gap-2"
+              disabled={!isFBSDKLoaded}
+            >
+              <Facebook className="w-5 h-5" />
+              Connect Facebook
+            </Button>
+            
+            {!isFBSDKLoaded && (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading Facebook SDK...
+              </p>
+            )}
+          </div>
 
+          {/* Connect Dialog */}
           <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
             <DialogContent>
               <DialogHeader>
@@ -163,33 +223,47 @@ const AdsManager = () => {
                   Connect Meta Business
                 </DialogTitle>
                 <DialogDescription>
-                  You'll be redirected to Meta to authorize access to your ad accounts
+                  Authorize access to manage your Facebook and Instagram ads
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <div className="p-4 rounded-lg bg-muted/50">
-                  <h4 className="font-medium mb-2">We'll request access to:</h4>
+                  <h4 className="font-medium mb-3">Permissions Required:</h4>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex items-center gap-2">
-                      <Target className="w-4 h-4" />
-                      Ad accounts and campaigns
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span>Read and manage ad campaigns</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4" />
-                      Ad performance metrics
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span>Access ad performance insights</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
-                      Click-to-WhatsApp ad creation
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span>Manage business assets</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span>Create Click-to-WhatsApp ads</span>
                     </li>
                   </ul>
+                </div>
+                
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <p>
+                      Make sure you have admin access to the Facebook Business Manager 
+                      and Ad Accounts you want to connect.
+                    </p>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowConnectDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleConnect} disabled={isConnecting}>
+                <Button onClick={handleConnect} disabled={isConnecting || !isFBSDKLoaded}>
                   {isConnecting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -210,9 +284,77 @@ const AdsManager = () => {
     );
   }
 
+  // Connected state with full Ads Manager
   return (
     <DashboardLayout title="Ads Manager" subtitle="Create and manage Click-to-WhatsApp ads">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        {/* Connection Status Card */}
+        <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                  <Link2 className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium flex items-center gap-2">
+                    Meta Ads Connected
+                    <Badge variant="secondary" className="bg-green-100 text-green-700">
+                      Active
+                    </Badge>
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {adAccounts.length} ad account{adAccounts.length !== 1 ? 's' : ''} available
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleSync}
+                  disabled={syncCampaigns.isPending || !selectedAdAccount}
+                >
+                  {syncCampaigns.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  Sync
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleDisconnect}
+                  disabled={disconnectMeta.isPending}
+                >
+                  <Unlink className="w-4 h-4 mr-1" />
+                  Disconnect
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ad Account Selector */}
+        {adAccounts.length > 0 && (
+          <div className="flex items-center gap-4">
+            <Label className="text-sm font-medium">Ad Account:</Label>
+            <Select value={selectedAdAccount || ""} onValueChange={setSelectedAdAccount}>
+              <SelectTrigger className="w-80">
+                <SelectValue placeholder="Select an ad account" />
+              </SelectTrigger>
+              <SelectContent>
+                {adAccounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name} ({account.id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -240,7 +382,7 @@ const AdsManager = () => {
                   <p className="text-2xl font-bold">{stats.totalMessages.toLocaleString()}</p>
                   <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
                     <ArrowUpRight className="w-3 h-3" />
-                    WhatsApp conversations started
+                    WhatsApp conversations
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-green-500/10">
@@ -255,7 +397,7 @@ const AdsManager = () => {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg. Cost/Message</p>
                   <p className="text-2xl font-bold">₹{stats.avgCostPerMessage.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Cost efficiency metric</p>
+                  <p className="text-xs text-muted-foreground mt-1">Cost efficiency</p>
                 </div>
                 <div className="p-3 rounded-xl bg-blue-500/10">
                   <TrendingUp className="w-5 h-5 text-blue-600" />
@@ -296,18 +438,30 @@ const AdsManager = () => {
           </Button>
         </div>
 
-        {/* Ads Table */}
+        {/* Campaigns Table */}
         <Card>
           <CardContent className="p-0">
             {filteredAds.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <Target className="w-12 h-12 text-muted-foreground/30 mb-4" />
                 <h3 className="font-medium text-lg">No campaigns yet</h3>
-                <p className="text-muted-foreground mt-1">Create your first Click-to-WhatsApp ad campaign</p>
-                <Button onClick={() => setShowCreateDialog(true)} className="mt-4 gap-2">
-                  <Plus className="w-4 h-4" />
-                  Create Campaign
-                </Button>
+                <p className="text-muted-foreground mt-1 text-center max-w-md">
+                  {selectedAdAccount 
+                    ? "Click 'Sync' to import existing campaigns from Meta, or create a new campaign"
+                    : "Select an ad account above to get started"}
+                </p>
+                {selectedAdAccount && (
+                  <div className="flex gap-3 mt-4">
+                    <Button variant="outline" onClick={handleSync} disabled={syncCampaigns.isPending}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Sync from Meta
+                    </Button>
+                    <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+                      <Plus className="w-4 h-4" />
+                      Create Campaign
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <Table>
@@ -355,8 +509,8 @@ const AdsManager = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusConfig[ad.status].color}>
-                          {statusConfig[ad.status].label}
+                        <Badge className={statusConfig[ad.status]?.color || "bg-gray-100 text-gray-700"}>
+                          {statusConfig[ad.status]?.label || ad.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-medium">₹{Number(ad.budget).toLocaleString()}</TableCell>
@@ -415,7 +569,9 @@ const AdsManager = () => {
             <DialogHeader>
               <DialogTitle>Create Click-to-WhatsApp Campaign</DialogTitle>
               <DialogDescription>
-                Set up a new Facebook/Instagram ad that drives conversations to WhatsApp
+                {isConnected 
+                  ? "Create a new campaign that will be synced to Meta Ads Manager"
+                  : "Set up a new Facebook/Instagram ad campaign"}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -427,30 +583,34 @@ const AdsManager = () => {
                   onChange={(e) => setNewAd({ ...newAd, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Platform</Label>
-                <Select
-                  value={newAd.platform}
-                  onValueChange={(v: "facebook" | "instagram") => setNewAd({ ...newAd, platform: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="facebook">Facebook</SelectItem>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Daily Budget (₹)</Label>
-                <Input 
-                  type="number" 
-                  placeholder="500"
-                  value={newAd.budget}
-                  onChange={(e) => setNewAd({ ...newAd, budget: e.target.value })}
-                />
-              </div>
+              {!isConnected && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Platform</Label>
+                    <Select
+                      value={newAd.platform}
+                      onValueChange={(v: "facebook" | "instagram") => setNewAd({ ...newAd, platform: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="facebook">Facebook</SelectItem>
+                        <SelectItem value="instagram">Instagram</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Daily Budget (₹)</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="500"
+                      value={newAd.budget}
+                      onChange={(e) => setNewAd({ ...newAd, budget: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-2">
                 <Label>Campaign Objective</Label>
                 <Textarea 
@@ -459,11 +619,23 @@ const AdsManager = () => {
                   onChange={(e) => setNewAd({ ...newAd, objective: e.target.value })}
                 />
               </div>
+              
+              {isConnected && (
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
+                  <p className="flex items-center gap-2">
+                    <Facebook className="w-4 h-4" />
+                    This campaign will be created in your Meta Ads Manager
+                  </p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-              <Button onClick={handleCreateAd} disabled={createAd.isPending}>
-                {createAd.isPending ? (
+              <Button 
+                onClick={handleCreateAd} 
+                disabled={createAd.isPending || createCampaign.isPending || !newAd.name.trim()}
+              >
+                {(createAd.isPending || createCampaign.isPending) ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Creating...
