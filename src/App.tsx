@@ -29,6 +29,7 @@ import AdsManager from "./pages/AdsManager";
 import HelpCenter from "./pages/HelpCenter";
 import Partners from "./pages/Partners";
 import Affiliates from "./pages/Affiliates";
+import ProductionChecklist from "./pages/ProductionChecklist";
 import NotFound from "./pages/NotFound";
 import { AIAssistant } from "@/components/help/AIAssistant";
 
@@ -169,6 +170,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Affiliates />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/production-checklist"
+                element={
+                  <ProtectedRoute>
+                    <ProductionChecklist />
                   </ProtectedRoute>
                 }
               />
