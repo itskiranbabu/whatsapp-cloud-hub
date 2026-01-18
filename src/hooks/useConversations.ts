@@ -162,9 +162,9 @@ export const useMessages = (conversationId: string | null) => {
     }) => {
       if (!currentTenant?.id) throw new Error("No tenant selected");
 
-      // Check if Meta Direct is configured
-      const hasMetaConfig = currentTenant.phone_number_id && currentTenant.meta_access_token;
-
+      // Check if Meta Direct is configured - use type assertion for extended tenant fields
+      const tenant = currentTenant as typeof currentTenant & { meta_access_token?: string };
+      const hasMetaConfig = tenant.phone_number_id && tenant.meta_access_token;
       if (hasMetaConfig) {
         // Use Meta Direct API - it handles message creation
         const { data, error } = await supabase.functions.invoke("whatsapp-meta-send", {
