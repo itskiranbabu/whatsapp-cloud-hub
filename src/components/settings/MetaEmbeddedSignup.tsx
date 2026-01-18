@@ -13,6 +13,10 @@ import {
   Gift,
   ArrowRight,
   Info,
+  AlertTriangle,
+  RefreshCw,
+  Settings2,
+  Phone,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTenants } from "@/hooks/useTenants";
@@ -21,7 +25,15 @@ import { supabase } from "@/integrations/supabase/client";
 interface MetaCredentials {
   wabaId: string;
   phoneNumberId: string;
-  accessToken: string;
+  accessToken?: string;
+  displayPhoneNumber?: string;
+  verifiedName?: string;
+}
+
+interface ConnectionStatus {
+  isValid: boolean;
+  expiresAt?: number;
+  scopes?: string[];
 }
 
 declare global {
@@ -69,14 +81,33 @@ interface MetaEmbeddedSignupProps {
 export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+  const [isSDKError, setIsSDKError] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionDetails, setConnectionDetails] = useState<{
+    wabaId?: string;
+    phoneNumberId?: string;
+    businessName?: string;
+    displayPhoneNumber?: string;
+  } | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
   const { currentTenant, refetch } = useTenants();
   const { toast } = useToast();
+
+  // Get Meta App credentials
+  const metaAppId = import.meta.env.VITE_META_APP_ID;
+  const metaConfigId = import.meta.env.VITE_META_CONFIG_ID;
 
   // Check if already connected
   useEffect(() => {
     if (currentTenant?.phone_number_id && currentTenant?.waba_id) {
       setIsConnected(true);
+      const tenantData = currentTenant as any;
+      setConnectionDetails({
+        wabaId: currentTenant.waba_id,
+        phoneNumberId: currentTenant.phone_number_id,
+        businessName: tenantData.business_name || currentTenant.business_name,
+      });
     }
   }, [currentTenant]);
 
@@ -88,21 +119,30 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
       return;
     }
 
+    // Check if credentials are configured
+    if (!metaAppId) {
+      console.warn('Meta App ID not configured');
+      setIsSDKError(true);
+      return;
+    }
+
     // Initialize FB SDK when it loads
     window.fbAsyncInit = function () {
-      // Get Meta App ID from environment or use fallback for demo
-      const metaAppId = import.meta.env.VITE_META_APP_ID;
-      if (!metaAppId) {
-        console.warn('Meta App ID not configured. Please add VITE_META_APP_ID secret.');
+      try {
+        window.FB.init({
+          appId: metaAppId,
+          cookie: true,
+          xfbml: true,
+          version: "v21.0",
+        });
+        window.FB.AppEvents.logPageView();
+        setIsSDKLoaded(true);
+        setIsSDKError(false);
+        console.log('Facebook SDK initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize Facebook SDK:', error);
+        setIsSDKError(true);
       }
-      window.FB.init({
-        appId: metaAppId || "YOUR_META_APP_ID",
-        cookie: true,
-        xfbml: true,
-        version: "v21.0",
-      });
-      window.FB.AppEvents.logPageView();
-      setIsSDKLoaded(true);
     };
 
     // Load the SDK asynchronously
@@ -111,7 +151,11 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
       const s = "script";
       const id = "facebook-jssdk";
       
-      if (d.getElementById(id)) return;
+      // Remove existing script if any
+      const existingScript = d.getElementById(id);
+      if (existingScript) {
+        existingScript.remove();
+      }
       
       const fjs = d.getElementsByTagName(s)[0];
       const js = d.createElement(s) as HTMLScriptElement;
@@ -119,17 +163,97 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
       js.src = "https://connect.facebook.net/en_US/sdk.js";
       js.async = true;
       js.defer = true;
+      js.crossOrigin = "anonymous";
+      
+      js.onerror = () => {
+        console.error('Failed to load Facebook SDK');
+        setIsSDKError(true);
+      };
+      
       fjs.parentNode?.insertBefore(js, fjs);
     };
 
     loadSDK();
-  }, []);
+
+    // Set a timeout to detect if SDK fails to load
+    const timeout = setTimeout(() => {
+      if (!window.FB) {
+        console.warn('Facebook SDK load timeout');
+        setIsSDKError(true);
+      }
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, [metaAppId]);
+
+  // Validate connection status
+  const validateConnection = useCallback(async () => {
+    if (!currentTenant?.id || !isConnected) return;
+
+    setIsValidating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-meta-auth", {
+        body: {
+          action: "debug_connection",
+          tenant_id: currentTenant.id,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setConnectionStatus({
+          isValid: data.token_info?.is_valid ?? true,
+          expiresAt: data.token_info?.expires_at,
+          scopes: data.token_info?.scopes,
+        });
+        
+        if (data.connection?.business_name) {
+          setConnectionDetails(prev => ({
+            ...prev,
+            businessName: data.connection.business_name,
+          }));
+        }
+      } else {
+        setConnectionStatus({ isValid: false });
+      }
+    } catch (error) {
+      console.error('Validation error:', error);
+      setConnectionStatus({ isValid: false });
+    } finally {
+      setIsValidating(false);
+    }
+  }, [currentTenant?.id, isConnected]);
+
+  useEffect(() => {
+    if (isConnected && currentTenant?.id) {
+      validateConnection();
+    }
+  }, [isConnected, currentTenant?.id, validateConnection]);
 
   const handleEmbeddedSignup = useCallback(async () => {
     if (!isSDKLoaded || !window.FB) {
       toast({
         title: "SDK not loaded",
-        description: "Please wait for Facebook SDK to load and try again",
+        description: "Facebook SDK is not loaded. Please refresh the page and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!metaConfigId) {
+      toast({
+        title: "Configuration Missing",
+        description: "Meta Config ID is not configured. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!currentTenant?.id) {
+      toast({
+        title: "Tenant Required",
+        description: "Please select a workspace before connecting WhatsApp.",
         variant: "destructive",
       });
       return;
@@ -140,37 +264,57 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     try {
       window.FB.login(
         async (response) => {
+          console.log('Facebook login response:', response);
+
           if (response.authResponse?.code) {
             // Exchange the code for access token via our edge function
             try {
-              const { data, error } = await supabase.functions.invoke("whatsapp-meta-webhook", {
+              toast({
+                title: "Processing...",
+                description: "Connecting your WhatsApp Business Account...",
+              });
+
+              const { data, error } = await supabase.functions.invoke("whatsapp-meta-auth", {
                 body: {
                   action: "exchange_code",
                   code: response.authResponse.code,
-                  tenant_id: currentTenant?.id,
+                  tenant_id: currentTenant.id,
                 },
               });
 
-              if (error) throw error;
+              if (error) {
+                console.error('Exchange error:', error);
+                throw new Error(error.message || 'Failed to exchange authorization code');
+              }
 
               if (data?.success) {
                 setIsConnected(true);
-                refetch();
+                setConnectionDetails({
+                  wabaId: data.waba_id,
+                  phoneNumberId: data.phone_number_id,
+                  businessName: data.verified_name || data.waba_name,
+                  displayPhoneNumber: data.display_phone_number,
+                });
+                setConnectionStatus({ isValid: true });
+                
+                await refetch();
                 
                 toast({
-                  title: "WhatsApp Connected!",
-                  description: "Your WhatsApp Business Account has been connected successfully",
+                  title: "WhatsApp Connected! 🎉",
+                  description: `Connected to ${data.verified_name || data.waba_name} (${data.display_phone_number})`,
                 });
 
                 onSuccess?.({
                   wabaId: data.waba_id,
                   phoneNumberId: data.phone_number_id,
-                  accessToken: data.access_token,
+                  displayPhoneNumber: data.display_phone_number,
+                  verifiedName: data.verified_name,
                 });
               } else {
-                throw new Error(data?.error || "Failed to complete signup");
+                throw new Error(data?.error || "Failed to complete WhatsApp setup");
               }
             } catch (err) {
+              console.error('Connection error:', err);
               const message = err instanceof Error ? err.message : "Failed to complete signup";
               toast({
                 title: "Connection Failed",
@@ -179,6 +323,13 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
               });
               onError?.(message);
             }
+          } else if (response.status === 'unknown') {
+            toast({
+              title: "Popup Blocked",
+              description: "Please allow popups and try again, or check if you cancelled the signup.",
+              variant: "destructive",
+            });
+            onError?.("Popup blocked or cancelled");
           } else {
             toast({
               title: "Signup Cancelled",
@@ -190,7 +341,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
           setIsLoading(false);
         },
         {
-          config_id: import.meta.env.VITE_META_CONFIG_ID || "YOUR_CONFIG_ID",
+          config_id: metaConfigId,
           response_type: "code",
           override_default_response_type: true,
           extras: {
@@ -202,6 +353,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
       );
     } catch (error) {
       setIsLoading(false);
+      console.error('Login error:', error);
       const message = error instanceof Error ? error.message : "An error occurred";
       toast({
         title: "Error",
@@ -210,7 +362,42 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
       });
       onError?.(message);
     }
-  }, [isSDKLoaded, currentTenant?.id, onSuccess, onError, toast, refetch]);
+  }, [isSDKLoaded, metaConfigId, currentTenant?.id, onSuccess, onError, toast, refetch]);
+
+  const handleDisconnect = async () => {
+    if (!currentTenant?.id) return;
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-meta-auth", {
+        body: {
+          action: "disconnect",
+          tenant_id: currentTenant.id,
+        },
+      });
+
+      if (error) throw error;
+
+      setIsConnected(false);
+      setConnectionDetails(null);
+      setConnectionStatus(null);
+      await refetch();
+
+      toast({
+        title: "Disconnected",
+        description: "WhatsApp Business Account has been disconnected",
+      });
+    } catch (error) {
+      console.error('Disconnect error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const benefits = [
     { icon: Gift, text: "FREE webhook access (worth ₹2,399+/month)" },
@@ -218,19 +405,76 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     { icon: Shield, text: "Full white-label control" },
   ];
 
+  // Connected state UI
   if (isConnected) {
     return (
-      <Card className="border-green-200 bg-green-50/50">
+      <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50/50">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-full bg-green-100">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-full bg-green-100">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-semibold text-green-800">WhatsApp Business Connected</h3>
+                <p className="text-sm text-green-600">
+                  Connected via Meta Direct integration
+                </p>
+                {connectionDetails && (
+                  <div className="mt-3 space-y-2 text-sm">
+                    {connectionDetails.businessName && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Settings2 className="w-4 h-4" />
+                        <span>{connectionDetails.businessName}</span>
+                      </div>
+                    )}
+                    {connectionDetails.displayPhoneNumber && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="w-4 h-4" />
+                        <span>{connectionDetails.displayPhoneNumber}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      {isValidating ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      ) : connectionStatus?.isValid ? (
+                        <Badge variant="outline" className="text-green-600 border-green-300">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Token Valid
+                        </Badge>
+                      ) : connectionStatus ? (
+                        <Badge variant="outline" className="text-amber-600 border-amber-300">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          Token Expired
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-green-800">WhatsApp Business Connected</h3>
-              <p className="text-sm text-green-600">
-                Your account is connected via Meta Direct integration
-              </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={validateConnection}
+                disabled={isValidating}
+              >
+                {isValidating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={handleDisconnect}
+                disabled={isLoading}
+              >
+                Disconnect
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -238,6 +482,54 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     );
   }
 
+  // Error state - credentials not configured
+  if (isSDKError || !metaAppId || !metaConfigId) {
+    return (
+      <Card className="overflow-hidden border-amber-200">
+        <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-white/20">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <CardTitle className="text-white">Configuration Required</CardTitle>
+              <CardDescription className="text-amber-100">
+                Meta App credentials need to be configured
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          <Alert className="border-amber-200 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700">
+              <strong>Meta App credentials are not configured.</strong>
+              <br />
+              Please add the following secrets to enable WhatsApp connection:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li><code className="bg-amber-100 px-1 rounded">VITE_META_APP_ID</code> - Your Meta App ID</li>
+                <li><code className="bg-amber-100 px-1 rounded">VITE_META_CONFIG_ID</code> - Your Embedded Signup Config ID</li>
+                <li><code className="bg-amber-100 px-1 rounded">META_APP_SECRET</code> - Your Meta App Secret</li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+          <Button variant="outline" className="w-full" asChild>
+            <a 
+              href="https://developers.facebook.com/docs/whatsapp/embedded-signup" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              View Meta Setup Guide
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Default signup state
   return (
     <Card className="overflow-hidden">
       <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
@@ -301,7 +593,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
           ) : !isSDKLoaded ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Loading...
+              Loading Facebook SDK...
             </>
           ) : (
             <>
@@ -316,10 +608,15 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
 
         {/* Manual Setup Link */}
         <div className="text-center">
-          <button className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
+          <a 
+            href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+          >
             <ExternalLink className="w-3 h-3" />
             Prefer manual setup? View guide
-          </button>
+          </a>
         </div>
       </CardContent>
     </Card>
