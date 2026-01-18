@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.whatsapp-meta-templates]
 verify_jwt = false
 
+[functions.whatsapp-meta-auth]
+verify_jwt = false
+
 [functions.ai-assistant]
 enabled = true
 verify_jwt = false
@@ -32,4 +35,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.automation-engine]
+verify_jwt = false
+
+[functions.meta-ads-api]
 verify_jwt = false
