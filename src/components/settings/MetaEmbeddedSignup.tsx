@@ -296,12 +296,13 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     setIsLoading(true);
 
     try {
-      window.FB.login(
-        async (response) => {
+      const handleLoginResponse = (response: any) => {
+        // IMPORTANT: FB SDK can reject async callbacks; keep this callback synchronous.
+        void (async () => {
           console.log('Facebook login response:', response);
 
-          if (response.authResponse?.code) {
-            // Exchange the code for access token via our edge function
+          if (response?.authResponse?.code) {
+            // Exchange the code for access token via our backend function
             try {
               toast({
                 title: "Processing...",
@@ -331,9 +332,9 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
                   displayPhoneNumber: data.display_phone_number,
                 });
                 setConnectionStatus({ isValid: true });
-                
+
                 await refetch();
-                
+
                 toast({
                   title: "WhatsApp Connected! 🎉",
                   description: `Connected to ${data.verified_name || data.waba_name} (${data.display_phone_number})`,
@@ -358,7 +359,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
               });
               onError?.(message);
             }
-          } else if (response.status === 'unknown') {
+          } else if (response?.status === 'unknown') {
             toast({
               title: "Popup Blocked",
               description: "Please allow popups and try again, or check if you cancelled the signup.",
@@ -373,19 +374,21 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
             });
             onError?.("User cancelled signup");
           }
+
           setIsLoading(false);
+        })();
+      };
+
+      window.FB.login(handleLoginResponse, {
+        config_id: metaConfig.configId!,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          sessionInfoVersion: 3,
+          featureType: "only_waba_sharing",
+          setup: {},
         },
-        {
-          config_id: metaConfig.configId!,
-          response_type: "code",
-          override_default_response_type: true,
-          extras: {
-            sessionInfoVersion: 3,
-            featureType: "only_waba_sharing",
-            setup: {},
-          },
-        }
-      );
+      });
     } catch (error) {
       setIsLoading(false);
       console.error('Login error:', error);
