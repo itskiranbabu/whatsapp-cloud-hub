@@ -91,12 +91,51 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
   } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
+  const [isCheckingConfig, setIsCheckingConfig] = useState(true);
+  const [metaConfig, setMetaConfig] = useState<{
+    appId: string | null;
+    configId: string | null;
+    hasSecret: boolean;
+    configured: boolean;
+  }>({ appId: null, configId: null, hasSecret: false, configured: false });
   const { currentTenant, refetch } = useTenants();
   const { toast } = useToast();
 
-  // Get Meta App credentials
-  const metaAppId = import.meta.env.VITE_META_APP_ID;
-  const metaConfigId = import.meta.env.VITE_META_CONFIG_ID;
+  // Check Meta config from backend on mount
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("whatsapp-meta-auth", {
+          body: { action: "check_config" },
+        });
+
+        if (error) {
+          console.error('Config check error:', error);
+          setIsSDKError(true);
+          return;
+        }
+
+        console.log('Meta config:', data);
+        setMetaConfig({
+          appId: data.app_id,
+          configId: data.config_id,
+          hasSecret: data.has_secret,
+          configured: data.configured,
+        });
+
+        if (!data.configured) {
+          setIsSDKError(true);
+        }
+      } catch (err) {
+        console.error('Failed to check config:', err);
+        setIsSDKError(true);
+      } finally {
+        setIsCheckingConfig(false);
+      }
+    };
+
+    checkConfig();
+  }, []);
 
   // Check if already connected
   useEffect(() => {
@@ -111,18 +150,13 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     }
   }, [currentTenant]);
 
-  // Load Facebook SDK
+  // Load Facebook SDK after config is verified
   useEffect(() => {
+    if (isCheckingConfig || !metaConfig.configured) return;
+
     // Check if SDK is already loaded
     if (window.FB) {
       setIsSDKLoaded(true);
-      return;
-    }
-
-    // Check if credentials are configured
-    if (!metaAppId) {
-      console.warn('Meta App ID not configured');
-      setIsSDKError(true);
       return;
     }
 
@@ -130,7 +164,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     window.fbAsyncInit = function () {
       try {
         window.FB.init({
-          appId: metaAppId,
+          appId: metaConfig.appId!,
           cookie: true,
           xfbml: true,
           version: "v21.0",
@@ -184,7 +218,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     }, 10000);
 
     return () => clearTimeout(timeout);
-  }, [metaAppId]);
+  }, [metaConfig.appId, metaConfig.configured, isCheckingConfig]);
 
   // Validate connection status
   const validateConnection = useCallback(async () => {
@@ -241,7 +275,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
       return;
     }
 
-    if (!metaConfigId) {
+    if (!metaConfig.configId) {
       toast({
         title: "Configuration Missing",
         description: "Meta Config ID is not configured. Please contact support.",
@@ -341,7 +375,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
           setIsLoading(false);
         },
         {
-          config_id: metaConfigId,
+          config_id: metaConfig.configId!,
           response_type: "code",
           override_default_response_type: true,
           extras: {
@@ -362,7 +396,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
       });
       onError?.(message);
     }
-  }, [isSDKLoaded, metaConfigId, currentTenant?.id, onSuccess, onError, toast, refetch]);
+  }, [isSDKLoaded, metaConfig.configId, currentTenant?.id, onSuccess, onError, toast, refetch]);
 
   const handleDisconnect = async () => {
     if (!currentTenant?.id) return;
@@ -482,8 +516,20 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     );
   }
 
+  // Loading state
+  if (isCheckingConfig) {
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="p-8 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Checking configuration...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Error state - credentials not configured
-  if (isSDKError || !metaAppId || !metaConfigId) {
+  if (isSDKError || !metaConfig.configured) {
     return (
       <Card className="overflow-hidden border-amber-200">
         <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">

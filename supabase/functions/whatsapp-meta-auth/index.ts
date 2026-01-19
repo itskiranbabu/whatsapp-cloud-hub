@@ -198,6 +198,29 @@ serve(async (req) => {
 
     console.log('Auth action:', action, 'Tenant:', tenant_id);
 
+    // Check if Meta credentials are configured
+    if (action === 'check_config') {
+      const appId = Deno.env.get('VITE_META_APP_ID');
+      const appSecret = Deno.env.get('META_APP_SECRET');
+      const configId = Deno.env.get('VITE_META_CONFIG_ID');
+      
+      const isConfigured = !!(appId && appSecret && configId);
+      
+      console.log('Config check - App ID:', !!appId, 'Secret:', !!appSecret, 'Config ID:', !!configId);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          configured: isConfigured,
+          app_id: appId || null,
+          config_id: configId || null,
+          // Never expose the secret, just confirm it exists
+          has_secret: !!appSecret,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (action === 'exchange_code') {
       if (!code) {
         return new Response(
