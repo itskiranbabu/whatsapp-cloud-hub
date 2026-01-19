@@ -313,6 +313,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
                   action: "exchange_code",
                   code: response.authResponse.code,
                   tenant_id: currentTenant.id,
+                  redirect_uri: window.location.origin + window.location.pathname,
                 },
               });
 

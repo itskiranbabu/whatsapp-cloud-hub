@@ -43,7 +43,7 @@ interface WABAInfo {
 }
 
 // Exchange OAuth code for access token
-async function exchangeCodeForToken(code: string): Promise<TokenResponse> {
+async function exchangeCodeForToken(code: string, redirectUri?: string): Promise<TokenResponse> {
   const appId = Deno.env.get('VITE_META_APP_ID');
   const appSecret = Deno.env.get('META_APP_SECRET');
 
@@ -53,21 +53,58 @@ async function exchangeCodeForToken(code: string): Promise<TokenResponse> {
 
   console.log('Exchanging code for token with App ID:', appId);
 
-  const response = await fetch(
-    `${META_GRAPH_URL}/oauth/access_token?` +
+  // Build the token exchange URL
+  // For Embedded Signup with response_type=code, redirect_uri is typically the current page URL
+  // or can be omitted if using the default callback
+  let tokenUrl = `${META_GRAPH_URL}/oauth/access_token?` +
     `client_id=${appId}&` +
     `client_secret=${appSecret}&` +
-    `code=${code}`,
-    { method: 'GET' }
-  );
+    `code=${encodeURIComponent(code)}`;
 
-  if (!response.ok) {
-    const error = await response.json();
-    console.error('Token exchange error:', error);
-    throw new Error(error.error?.message || 'Failed to exchange code for token');
+  // Add redirect_uri if provided (required by some configurations)
+  if (redirectUri) {
+    tokenUrl += `&redirect_uri=${encodeURIComponent(redirectUri)}`;
   }
 
-  return await response.json();
+  console.log('Token exchange URL (without secrets):', `${META_GRAPH_URL}/oauth/access_token?client_id=${appId}&code=[REDACTED]`);
+
+  const response = await fetch(tokenUrl, { method: 'GET' });
+  const responseText = await response.text();
+  
+  console.log('Token exchange response status:', response.status);
+  
+  if (!response.ok) {
+    let error;
+    try {
+      error = JSON.parse(responseText);
+    } catch {
+      error = { error: { message: responseText } };
+    }
+    console.error('Token exchange error:', JSON.stringify(error));
+    
+    // Provide more helpful error messages
+    const errorMessage = error.error?.message || error.error?.error_description || 'Failed to exchange code for token';
+    const errorCode = error.error?.code;
+    
+    if (errorCode === 100 || errorMessage.includes('Invalid verification code')) {
+      throw new Error('The authorization code has expired or is invalid. Please try connecting again.');
+    }
+    if (errorMessage.includes('redirect_uri')) {
+      throw new Error('Redirect URI mismatch. Please ensure the app configuration is correct.');
+    }
+    
+    throw new Error(errorMessage);
+  }
+
+  let tokenData;
+  try {
+    tokenData = JSON.parse(responseText);
+  } catch {
+    throw new Error('Invalid response from Meta API');
+  }
+  
+  console.log('Token obtained successfully, type:', tokenData.token_type);
+  return tokenData;
 }
 
 // Get long-lived access token
@@ -194,7 +231,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, code, tenant_id } = await req.json();
+    const { action, code, tenant_id, redirect_uri } = await req.json();
 
     console.log('Auth action:', action, 'Tenant:', tenant_id);
 
@@ -238,7 +275,25 @@ serve(async (req) => {
 
       // Step 1: Exchange code for short-lived token
       console.log('Step 1: Exchanging code for token...');
-      const tokenResponse = await exchangeCodeForToken(code);
+      console.log('Redirect URI provided:', redirect_uri || 'none');
+      
+      let tokenResponse;
+      try {
+        tokenResponse = await exchangeCodeForToken(code, redirect_uri);
+      } catch (tokenError) {
+        console.error('Token exchange failed:', tokenError);
+        // If first attempt fails with redirect_uri, try without it (some configs don't need it)
+        if (redirect_uri) {
+          console.log('Retrying without redirect_uri...');
+          try {
+            tokenResponse = await exchangeCodeForToken(code);
+          } catch (retryError) {
+            throw tokenError; // Throw original error if retry also fails
+          }
+        } else {
+          throw tokenError;
+        }
+      }
       console.log('Short-lived token obtained');
 
       // Step 2: Get long-lived token
