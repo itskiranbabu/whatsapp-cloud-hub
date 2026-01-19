@@ -149,9 +149,10 @@ export const useMetaAds = () => {
     }
 
     return new Promise<void>((resolve, reject) => {
-      (window as any).FB.login(
-        async (response: any) => {
-          if (response.authResponse) {
+      const handleLoginResponse = (response: any) => {
+        // Keep this callback synchronous; FB SDK can throw on async callbacks.
+        void (async () => {
+          if (response?.authResponse) {
             try {
               const { data: session } = await supabase.auth.getSession();
               if (!session.session) throw new Error("Not authenticated");
@@ -170,7 +171,7 @@ export const useMetaAds = () => {
                     redirect_uri: window.location.origin,
                   }),
                 }
-              ).then(r => r.json());
+              ).then((r) => r.json());
 
               if (result.error) {
                 throw new Error(result.error);
@@ -178,7 +179,7 @@ export const useMetaAds = () => {
 
               queryClient.invalidateQueries({ queryKey: ["meta-ads-connection"] });
               queryClient.invalidateQueries({ queryKey: ["meta-ad-accounts"] });
-              
+
               toast({
                 title: "Meta Ads Connected!",
                 description: `Found ${result.ad_accounts?.length || 0} ad accounts`,
@@ -201,12 +202,13 @@ export const useMetaAds = () => {
             });
             reject(new Error("User cancelled login"));
           }
-        },
-        {
-          scope: "ads_management,ads_read,business_management,pages_read_engagement",
-          return_scopes: true,
-        }
-      );
+        })();
+      };
+
+      (window as any).FB.login(handleLoginResponse, {
+        scope: "ads_management,ads_read,business_management,pages_read_engagement",
+        return_scopes: true,
+      });
     });
   }, [isFBSDKLoaded, currentTenantId, queryClient, toast]);
 
