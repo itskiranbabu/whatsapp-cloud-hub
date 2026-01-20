@@ -1112,6 +1112,75 @@ export type Database = {
           },
         ]
       }
+      tenant_quotas: {
+        Row: {
+          ads_calls_limit_daily: number
+          ads_calls_today: number
+          ai_calls_limit_daily: number
+          ai_calls_today: number
+          automation_runs_limit_daily: number
+          automation_runs_today: number
+          created_at: string
+          id: string
+          last_reset_at: string
+          messages_limit_daily: number
+          messages_sent_today: number
+          template_calls_limit_daily: number
+          template_calls_today: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ads_calls_limit_daily?: number
+          ads_calls_today?: number
+          ai_calls_limit_daily?: number
+          ai_calls_today?: number
+          automation_runs_limit_daily?: number
+          automation_runs_today?: number
+          created_at?: string
+          id?: string
+          last_reset_at?: string
+          messages_limit_daily?: number
+          messages_sent_today?: number
+          template_calls_limit_daily?: number
+          template_calls_today?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ads_calls_limit_daily?: number
+          ads_calls_today?: number
+          ai_calls_limit_daily?: number
+          ai_calls_today?: number
+          automation_runs_limit_daily?: number
+          automation_runs_today?: number
+          created_at?: string
+          id?: string
+          last_reset_at?: string
+          messages_limit_daily?: number
+          messages_sent_today?: number
+          template_calls_limit_daily?: number
+          template_calls_today?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_quotas_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_quotas_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           bsp_credentials: Json | null
@@ -1365,6 +1434,11 @@ export type Database = {
       }
     }
     Functions: {
+      check_and_increment_quota: {
+        Args: { _quota_type: string; _tenant_id: string }
+        Returns: boolean
+      }
+      get_quota_status: { Args: { _tenant_id: string }; Returns: Json }
       get_user_tenant_ids: { Args: { _user_id: string }; Returns: string[] }
       has_role: {
         Args: {
