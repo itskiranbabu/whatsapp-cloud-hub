@@ -136,25 +136,27 @@ const Integrations = () => {
       
       // For OAuth-based integrations with external auth
       if (oauthConfig?.authUrl) {
-        // In production, this would redirect to the OAuth provider
-        // For now, we'll simulate the connection
+        // OAuth integrations should redirect to the OAuth provider
+        // Credentials are handled server-side via edge functions after callback
         toast({
           title: "OAuth Integration",
           description: `Redirecting to ${selectedIntegration.name} for authorization...`,
         });
         
-        // Simulate OAuth callback
+        // Simulate OAuth redirect - in production, redirect to OAuth provider
+        // The callback would be handled by an edge function that stores credentials securely
         await new Promise(resolve => setTimeout(resolve, 1500));
         
+        // Only store non-sensitive config - credentials handled server-side
         await connectIntegration.mutateAsync({
           integrationType: selectedIntegration.type,
           name: selectedIntegration.name,
-          config: { oauth_connected: true, connected_at: new Date().toISOString() },
-          credentials: { access_token: "oauth_token_placeholder" },
+          config: { oauth_pending: true, connected_at: new Date().toISOString() },
+          // Note: No credentials sent from client - handled by OAuth callback edge function
         });
       } else if (oauthConfig?.fields?.length) {
-        // For API key-based integrations
-        const credentials: Record<string, string> = {};
+        // For API key-based integrations, we need to use an edge function
+        // to securely store credentials server-side
         const config: Record<string, string> = {};
         
         for (const field of oauthConfig.fields) {
@@ -168,18 +170,24 @@ const Integrations = () => {
             return;
           }
           
-          if (field.type === "password" || field.key.includes("secret") || field.key.includes("key")) {
-            credentials[field.key] = formData[field.key];
-          } else {
+          // Only store non-sensitive fields in config
+          if (field.type !== "password" && !field.key.includes("secret") && !field.key.includes("key")) {
             config[field.key] = formData[field.key];
           }
         }
         
+        // TODO: API key integrations should use an edge function for secure credential storage
+        // For now, only store the non-sensitive config
         await connectIntegration.mutateAsync({
           integrationType: selectedIntegration.type,
           name: selectedIntegration.name,
-          config: { ...config, connected_at: new Date().toISOString() },
-          credentials,
+          config: { ...config, connected_at: new Date().toISOString(), requires_credential_setup: true },
+          // Note: Credentials NOT sent from client - needs edge function implementation
+        });
+        
+        toast({
+          title: "Integration Partially Connected",
+          description: "Configuration saved. Secure credential setup via API is pending.",
         });
       } else {
         // Simple connection without credentials
@@ -187,7 +195,7 @@ const Integrations = () => {
           integrationType: selectedIntegration.type,
           name: selectedIntegration.name,
           config: { connected_at: new Date().toISOString() },
-          credentials: {},
+          // No credentials needed for simple integrations
         });
       }
       
