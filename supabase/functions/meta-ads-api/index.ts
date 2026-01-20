@@ -187,6 +187,9 @@ async function deleteCampaign(campaignId: string, accessToken: string) {
   return data;
 }
 
+// Actions that are rate limited (mutating operations)
+const RATE_LIMITED_ACTIONS = ['create_campaign', 'update_campaign_status', 'delete_campaign', 'sync_campaigns'];
+
 serve(async (req) => {
   // Handle CORS
   if (req.method === "OPTIONS") {
@@ -230,6 +233,29 @@ serve(async (req) => {
     if (!hasAccess) {
       throw new Error("Access denied to this tenant");
     }
+
+    // ========== RATE LIMITING: Check ads quota for mutating actions ==========
+    if (action && RATE_LIMITED_ACTIONS.includes(action)) {
+      const { data: quotaAllowed, error: quotaError } = await supabase.rpc('check_and_increment_quota', {
+        _tenant_id: tenantId,
+        _quota_type: 'ads'
+      });
+
+      if (quotaError) {
+        console.error('Quota check error:', quotaError);
+        // Don't block on quota errors, just log
+      } else if (!quotaAllowed) {
+        console.log('Ads API rate limit exceeded for tenant:', tenantId);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Daily ads API quota exceeded. Please upgrade your plan or try again tomorrow.',
+            code: 'QUOTA_EXCEEDED'
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // ========== END RATE LIMITING ==========
 
     let result: any;
 

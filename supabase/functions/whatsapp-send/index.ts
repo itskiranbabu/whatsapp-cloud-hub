@@ -254,6 +254,27 @@ serve(async (req) => {
       );
     }
 
+    // ========== RATE LIMITING: Check message quota ==========
+    const { data: quotaAllowed, error: quotaError } = await supabase.rpc('check_and_increment_quota', {
+      _tenant_id: tenant_id,
+      _quota_type: 'messages'
+    });
+
+    if (quotaError) {
+      console.error('Quota check error:', quotaError);
+      // Don't block on quota errors, just log
+    } else if (!quotaAllowed) {
+      console.log('Rate limit exceeded for tenant:', tenant_id);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Daily message quota exceeded. Please upgrade your plan or try again tomorrow.',
+          code: 'QUOTA_EXCEEDED'
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    // ========== END RATE LIMITING ==========
+
     // Get tenant configuration
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')

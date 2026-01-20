@@ -92,6 +92,30 @@ serve(async (req) => {
 
     const { action, automation_id, tenant_id, conversation_id, contact_id, trigger_data } = await req.json();
 
+    // ========== RATE LIMITING: Check automation quota ==========
+    if (tenant_id && action === "execute") {
+      const { data: quotaAllowed, error: quotaError } = await supabase.rpc('check_and_increment_quota', {
+        _tenant_id: tenant_id,
+        _quota_type: 'automations'
+      });
+
+      if (quotaError) {
+        console.error('Quota check error:', quotaError);
+        // Don't block on quota errors, just log
+      } else if (!quotaAllowed) {
+        console.log('Automation rate limit exceeded for tenant:', tenant_id);
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Daily automation execution quota exceeded. Please upgrade your plan or try again tomorrow.',
+            code: 'QUOTA_EXCEEDED'
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // ========== END RATE LIMITING ==========
+
     if (action === "execute") {
       const { data: automation, error: automationErr } = await supabase
         .from("automations").select("*").eq("id", automation_id).single();
