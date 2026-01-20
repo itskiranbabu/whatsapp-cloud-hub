@@ -265,7 +265,7 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
     }
   }, [isConnected, currentTenant?.id, validateConnection]);
 
-  const handleEmbeddedSignup = useCallback(async () => {
+  const handleEmbeddedSignup = useCallback(() => {
     if (!isSDKLoaded || !window.FB) {
       toast({
         title: "SDK not loaded",
