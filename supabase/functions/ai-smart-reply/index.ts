@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,54 @@ serve(async (req) => {
   }
 
   try {
-    const { customerMessage, conversationHistory, contactName } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify JWT and get user
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "No authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { customerMessage, conversationHistory, contactName, tenant_id } = await req.json();
+
+    // ========== RATE LIMITING: Check AI quota if tenant_id provided ==========
+    if (tenant_id) {
+      const { data: quotaAllowed, error: quotaError } = await supabase.rpc('check_and_increment_quota', {
+        _tenant_id: tenant_id,
+        _quota_type: 'ai'
+      });
+
+      if (quotaError) {
+        console.error('Quota check error:', quotaError);
+        // Don't block on quota errors, just log
+      } else if (!quotaAllowed) {
+        console.log('AI rate limit exceeded for tenant:', tenant_id);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Daily AI quota exceeded. Please upgrade your plan or try again tomorrow.',
+            code: 'QUOTA_EXCEEDED'
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // ========== END RATE LIMITING ==========
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
