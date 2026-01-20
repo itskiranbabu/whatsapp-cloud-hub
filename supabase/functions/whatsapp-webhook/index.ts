@@ -229,33 +229,25 @@ async function handle360DialogWebhook(supabase: any, payload: Dialog360WebhookPa
   return { processed: true };
 }
 
-// Get BSP credentials from tenant_credentials table (secure) or fallback to tenants table
+// Get BSP credentials ONLY from tenant_credentials table (secure storage)
+// SECURITY: Removed fallback to tenants table to prevent credential exposure
 async function getBspCredentials(supabase: any, tenantId: string): Promise<{ authToken?: string; appSecret?: string }> {
-  // First try the secure tenant_credentials table
-  const { data: credentials } = await supabase
+  // Use ONLY the secure tenant_credentials table - no fallback to tenants table
+  const { data: credentials, error } = await supabase
     .from('tenant_credentials')
     .select('bsp_credentials')
     .eq('tenant_id', tenantId)
     .single();
   
+  if (error) {
+    console.log('No credentials found in tenant_credentials for tenant:', tenantId);
+    return {};
+  }
+  
   if (credentials?.bsp_credentials) {
     return {
       authToken: credentials.bsp_credentials.twilio_auth_token,
       appSecret: credentials.bsp_credentials.dialog360_app_secret,
-    };
-  }
-  
-  // Fallback to tenants table (legacy - will be migrated)
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('bsp_credentials')
-    .eq('id', tenantId)
-    .single();
-  
-  if (tenant?.bsp_credentials) {
-    return {
-      authToken: tenant.bsp_credentials.twilio_auth_token,
-      appSecret: tenant.bsp_credentials.dialog360_app_secret,
     };
   }
   
@@ -299,7 +291,7 @@ serve(async (req) => {
       const payload: TwilioWebhookPayload = Object.fromEntries(formData.entries()) as unknown as TwilioWebhookPayload;
       const params = Object.fromEntries(formData.entries()) as Record<string, string>;
       
-      // Get Twilio auth token from tenant credentials or environment
+      // Get Twilio auth token from secure tenant credentials or environment
       let authToken: string | undefined;
       
       if (tenantId) {
@@ -307,7 +299,7 @@ serve(async (req) => {
         authToken = creds.authToken;
       }
       
-      // Fallback to global Twilio auth token
+      // Fallback to global Twilio auth token from environment
       if (!authToken) {
         authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
       }
@@ -343,7 +335,7 @@ serve(async (req) => {
       const rawBody = await req.text();
       const payload: Dialog360WebhookPayload = JSON.parse(rawBody);
       
-      // Get app secret from tenant credentials or environment
+      // Get app secret from secure tenant credentials or environment
       let appSecret: string | undefined;
       
       if (tenantId) {
