@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,6 +48,69 @@ interface Dialog360WebhookPayload {
       field: string;
     }>;
   }>;
+}
+
+// Validate Twilio webhook signature
+// Twilio signs requests using HMAC-SHA1 with the full URL + sorted params
+function validateTwilioSignature(
+  url: string,
+  params: Record<string, string>,
+  signature: string,
+  authToken: string
+): boolean {
+  if (!signature || !authToken) {
+    console.log('Missing Twilio signature or auth token');
+    return false;
+  }
+
+  try {
+    // Sort params alphabetically and concatenate key-value pairs
+    const sortedParams = Object.keys(params)
+      .sort()
+      .map(key => `${key}${params[key]}`)
+      .join('');
+    
+    const data = url + sortedParams;
+    const expectedSignature = createHmac('sha1', authToken)
+      .update(data)
+      .digest('base64');
+    
+    const isValid = signature === expectedSignature;
+    if (!isValid) {
+      console.log('Twilio signature mismatch');
+    }
+    return isValid;
+  } catch (error) {
+    console.error('Twilio signature validation error:', error);
+    return false;
+  }
+}
+
+// Validate 360dialog webhook signature (uses same HMAC-SHA256 as Meta)
+function validate360DialogSignature(
+  payload: string,
+  signature: string,
+  appSecret: string
+): boolean {
+  if (!signature || !appSecret) {
+    console.log('Missing 360dialog signature or app secret');
+    return false;
+  }
+
+  try {
+    const expectedSignature = 'sha256=' + createHmac('sha256', appSecret)
+      .update(payload)
+      .digest('hex');
+    
+    const isValid = signature === expectedSignature;
+    if (!isValid) {
+      console.log('360dialog signature mismatch');
+    }
+    return isValid;
+  } catch (error) {
+    console.error('360dialog signature validation error:', error);
+    return false;
+  }
 }
 
 // deno-lint-ignore no-explicit-any
@@ -165,6 +229,39 @@ async function handle360DialogWebhook(supabase: any, payload: Dialog360WebhookPa
   return { processed: true };
 }
 
+// Get BSP credentials from tenant_credentials table (secure) or fallback to tenants table
+async function getBspCredentials(supabase: any, tenantId: string): Promise<{ authToken?: string; appSecret?: string }> {
+  // First try the secure tenant_credentials table
+  const { data: credentials } = await supabase
+    .from('tenant_credentials')
+    .select('bsp_credentials')
+    .eq('tenant_id', tenantId)
+    .single();
+  
+  if (credentials?.bsp_credentials) {
+    return {
+      authToken: credentials.bsp_credentials.twilio_auth_token,
+      appSecret: credentials.bsp_credentials.dialog360_app_secret,
+    };
+  }
+  
+  // Fallback to tenants table (legacy - will be migrated)
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('bsp_credentials')
+    .eq('id', tenantId)
+    .single();
+  
+  if (tenant?.bsp_credentials) {
+    return {
+      authToken: tenant.bsp_credentials.twilio_auth_token,
+      appSecret: tenant.bsp_credentials.dialog360_app_secret,
+    };
+  }
+  
+  return {};
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -172,6 +269,7 @@ serve(async (req) => {
 
   const url = new URL(req.url);
   const provider = url.searchParams.get('provider') || 'twilio';
+  const tenantId = url.searchParams.get('tenant');
 
   if (req.method === 'GET') {
     const mode = url.searchParams.get('hub.mode');
@@ -189,12 +287,89 @@ serve(async (req) => {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     if (provider === 'twilio') {
+      // SECURITY: Validate Twilio signature
+      const twilioSignature = req.headers.get('x-twilio-signature');
+      
+      if (!twilioSignature) {
+        console.error('Missing X-Twilio-Signature header - rejecting request');
+        return new Response('Missing signature', { status: 401, headers: corsHeaders });
+      }
+
       const formData = await req.formData();
       const payload: TwilioWebhookPayload = Object.fromEntries(formData.entries()) as unknown as TwilioWebhookPayload;
+      const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+      
+      // Get Twilio auth token from tenant credentials or environment
+      let authToken: string | undefined;
+      
+      if (tenantId) {
+        const creds = await getBspCredentials(supabase, tenantId);
+        authToken = creds.authToken;
+      }
+      
+      // Fallback to global Twilio auth token
+      if (!authToken) {
+        authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+      }
+      
+      if (!authToken) {
+        console.error('No Twilio auth token configured for signature validation');
+        return new Response('Webhook security not configured', { status: 401, headers: corsHeaders });
+      }
+      
+      // Build the full URL for signature validation
+      const fullUrl = req.url;
+      const isValid = validateTwilioSignature(fullUrl, params, twilioSignature, authToken);
+      
+      if (!isValid) {
+        console.error('Invalid Twilio signature - possible forgery attempt');
+        return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+      }
+      
+      console.log('✅ Twilio webhook signature validated');
+      
       await handleTwilioWebhook(supabase, payload, !!payload.MessageStatus);
       return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', { headers: { ...corsHeaders, 'Content-Type': 'application/xml' } });
+      
     } else if (provider === '360dialog') {
-      const payload: Dialog360WebhookPayload = await req.json();
+      // SECURITY: Validate 360dialog signature (same as Meta - HMAC-SHA256)
+      const signature = req.headers.get('x-hub-signature-256');
+      
+      if (!signature) {
+        console.error('Missing X-Hub-Signature-256 header - rejecting request');
+        return new Response('Missing signature', { status: 401, headers: corsHeaders });
+      }
+      
+      const rawBody = await req.text();
+      const payload: Dialog360WebhookPayload = JSON.parse(rawBody);
+      
+      // Get app secret from tenant credentials or environment
+      let appSecret: string | undefined;
+      
+      if (tenantId) {
+        const creds = await getBspCredentials(supabase, tenantId);
+        appSecret = creds.appSecret;
+      }
+      
+      // Fallback to global Meta app secret (360dialog uses same format)
+      if (!appSecret) {
+        appSecret = Deno.env.get('META_APP_SECRET');
+      }
+      
+      if (!appSecret) {
+        console.error('No app secret configured for 360dialog signature validation');
+        return new Response('Webhook security not configured', { status: 401, headers: corsHeaders });
+      }
+      
+      const isValid = validate360DialogSignature(rawBody, signature, appSecret);
+      
+      if (!isValid) {
+        console.error('Invalid 360dialog signature - possible forgery attempt');
+        return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+      }
+      
+      console.log('✅ 360dialog webhook signature validated');
+      
       const result = await handle360DialogWebhook(supabase, payload);
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
