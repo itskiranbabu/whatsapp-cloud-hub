@@ -219,27 +219,18 @@ serve(async (req) => {
       throw new Error('Meta Cloud API not configured for this tenant. Please configure your Meta credentials.');
     }
 
-    // Get credentials from secure tenant_credentials table (service role bypasses RLS)
+    // Get credentials from secure tenant_credentials table only (service role bypasses RLS)
     const { data: credentials, error: credentialsError } = await supabase
       .from('tenant_credentials')
       .select('meta_access_token')
       .eq('tenant_id', tenant_id)
       .single();
 
-    // Fallback to tenants table for backwards compatibility during migration
-    let accessToken = credentials?.meta_access_token;
-    if (!accessToken) {
-      const { data: tenantCreds } = await supabase
-        .from('tenants')
-        .select('meta_access_token')
-        .eq('id', tenant_id)
-        .single();
-      accessToken = tenantCreds?.meta_access_token;
-    }
-
-    if (!accessToken) {
+    if (credentialsError || !credentials?.meta_access_token) {
       throw new Error('Meta Cloud API not configured for this tenant. Please configure your Meta credentials.');
     }
+
+    const accessToken = credentials.meta_access_token;
 
     // Get contact
     const { data: contact, error: contactError } = await supabase

@@ -365,11 +365,7 @@ serve(async (req) => {
 
       if (credError) {
         console.error('Failed to save secure credentials:', credError);
-        // Also save to tenants table as fallback for backwards compatibility
-        await supabase
-          .from('tenants')
-          .update({ meta_access_token: longLivedToken.access_token })
-          .eq('id', tenant_id);
+        throw new Error('Failed to store credentials securely');
       }
 
       console.log('Successfully connected Meta Direct for tenant:', tenant_id);
@@ -403,24 +399,14 @@ serve(async (req) => {
         .eq('id', tenant_id)
         .single();
 
-      // Get access token from secure table first, fallback to tenants
-      let accessToken: string | null = null;
+      // Get access token from secure tenant_credentials table only
       const { data: credentials } = await supabase
         .from('tenant_credentials')
         .select('meta_access_token')
         .eq('tenant_id', tenant_id)
         .single();
       
-      accessToken = credentials?.meta_access_token || null;
-      
-      if (!accessToken) {
-        const { data: tenantCreds } = await supabase
-          .from('tenants')
-          .select('meta_access_token')
-          .eq('id', tenant_id)
-          .single();
-        accessToken = tenantCreds?.meta_access_token;
-      }
+      const accessToken = credentials?.meta_access_token || null;
 
       if (error || !accessToken) {
         return new Response(

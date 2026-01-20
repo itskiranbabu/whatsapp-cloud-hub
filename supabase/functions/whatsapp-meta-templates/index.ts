@@ -266,10 +266,10 @@ serve(async (req) => {
       throw new Error('Access denied');
     }
 
-    // Get tenant Meta credentials
+    // Get tenant non-sensitive info from tenants table
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('waba_id, meta_access_token')
+      .select('waba_id, phone_number_id')
       .eq('id', tenantId)
       .single();
 
@@ -277,15 +277,28 @@ serve(async (req) => {
       throw new Error('Tenant not found');
     }
 
-    if (!tenant.waba_id || !tenant.meta_access_token) {
-      throw new Error('Meta Cloud API not configured. Please set up your WABA ID and access token.');
+    if (!tenant.waba_id) {
+      throw new Error('Meta Cloud API not configured. Please set up your WABA ID.');
     }
+
+    // Get credentials from secure tenant_credentials table only
+    const { data: credentials, error: credentialsError } = await supabase
+      .from('tenant_credentials')
+      .select('meta_access_token')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (credentialsError || !credentials?.meta_access_token) {
+      throw new Error('Meta Cloud API not configured. Please configure your Meta credentials.');
+    }
+
+    const accessToken = credentials.meta_access_token;
 
     let result;
 
     switch (action) {
       case 'list':
-        result = await getTemplates(tenant.waba_id, tenant.meta_access_token);
+        result = await getTemplates(tenant.waba_id, accessToken);
         break;
 
       case 'get':
@@ -293,13 +306,13 @@ serve(async (req) => {
         if (!templateName) {
           throw new Error('Template name is required');
         }
-        result = await getTemplateByName(tenant.waba_id, tenant.meta_access_token, templateName);
+        result = await getTemplateByName(tenant.waba_id, accessToken, templateName);
         break;
 
       case 'create':
         result = await createTemplate(
           tenant.waba_id,
-          tenant.meta_access_token,
+          accessToken,
           body.name,
           body.category,
           body.language || 'en',
@@ -312,11 +325,11 @@ serve(async (req) => {
         if (!nameToDelete) {
           throw new Error('Template name is required');
         }
-        result = await deleteTemplate(tenant.waba_id, tenant.meta_access_token, nameToDelete);
+        result = await deleteTemplate(tenant.waba_id, accessToken, nameToDelete);
         break;
 
       case 'sync':
-        result = await syncTemplates(supabase, tenantId, tenant.waba_id, tenant.meta_access_token);
+        result = await syncTemplates(supabase, tenantId, tenant.waba_id, accessToken);
         break;
 
       default:
