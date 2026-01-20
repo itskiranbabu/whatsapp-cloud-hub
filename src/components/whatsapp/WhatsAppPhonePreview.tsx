@@ -38,9 +38,20 @@ export const WhatsAppPhonePreview = ({
     return processed;
   };
 
-  // Format body text with WhatsApp formatting
+  // Escape HTML entities to prevent XSS attacks
+  const escapeHtml = (text: string): string => {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  // Format body text with WhatsApp formatting (with XSS protection)
   const formatBody = (text: string) => {
-    let formatted = processText(text);
+    // IMPORTANT: Escape HTML FIRST to prevent XSS, then apply formatting
+    let formatted = escapeHtml(processText(text));
     // Bold: *text*
     formatted = formatted.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
     // Italic: _text_

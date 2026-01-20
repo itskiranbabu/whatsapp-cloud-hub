@@ -129,8 +129,17 @@ serve(async (req) => {
 
       console.log('Webhook received:', JSON.stringify(payload, null, 2));
 
-      // Verify signature if app secret is available
+      // SECURITY: Always enforce signature validation
       const signature = req.headers.get('x-hub-signature-256');
+      
+      // Require signature header for all webhook requests
+      if (!signature) {
+        console.error('Missing x-hub-signature-256 header - rejecting request');
+        return new Response('Missing signature header', { status: 401 });
+      }
+
+      // Get app secret from tenant or global fallback
+      let appSecret: string | null = null;
       
       if (tenantId) {
         const { data: tenant } = await supabase
@@ -138,15 +147,29 @@ serve(async (req) => {
           .select('meta_app_secret')
           .eq('id', tenantId)
           .single();
-
-        if (tenant?.meta_app_secret && signature) {
-          const isValid = verifySignature(rawBody, signature, tenant.meta_app_secret);
-          if (!isValid) {
-            console.error('Invalid webhook signature');
-            return new Response('Invalid signature', { status: 401 });
-          }
-        }
+        
+        appSecret = tenant?.meta_app_secret || null;
       }
+      
+      // Fallback to global app secret if tenant-specific not available
+      if (!appSecret) {
+        appSecret = Deno.env.get('META_APP_SECRET') || null;
+      }
+      
+      // Reject if no app secret is configured anywhere
+      if (!appSecret) {
+        console.error('No app secret configured for webhook validation');
+        return new Response('Webhook security not configured', { status: 401 });
+      }
+      
+      // Validate signature
+      const isValid = verifySignature(rawBody, signature, appSecret);
+      if (!isValid) {
+        console.error('Invalid webhook signature - possible forgery attempt');
+        return new Response('Invalid signature', { status: 401 });
+      }
+      
+      console.log('✅ Webhook signature validated successfully');
 
       if (payload.object !== 'whatsapp_business_account') {
         return new Response('OK', { status: 200 });
