@@ -67,6 +67,40 @@ function verifySignature(payload: string, signature: string, appSecret: string):
   }
 }
 
+// Get app secret ONLY from tenant_credentials table (secure storage)
+// SECURITY: Removed fallback to tenants table to prevent credential exposure
+async function getAppSecret(supabase: any, tenantId: string): Promise<string | null> {
+  // Use ONLY the secure tenant_credentials table - no fallback to tenants table
+  const { data: credentials, error } = await supabase
+    .from('tenant_credentials')
+    .select('meta_app_secret')
+    .eq('tenant_id', tenantId)
+    .single();
+  
+  if (error) {
+    console.log('No credentials found in tenant_credentials for tenant:', tenantId);
+    return null;
+  }
+  
+  return credentials?.meta_app_secret || null;
+}
+
+// Get verify token ONLY from tenant_credentials table (secure storage)
+async function getVerifyToken(supabase: any, tenantId: string): Promise<string | null> {
+  const { data: credentials, error } = await supabase
+    .from('tenant_credentials')
+    .select('meta_webhook_verify_token')
+    .eq('tenant_id', tenantId)
+    .single();
+  
+  if (error) {
+    console.log('No credentials found in tenant_credentials for tenant:', tenantId);
+    return null;
+  }
+  
+  return credentials?.meta_webhook_verify_token || null;
+}
+
 serve(async (req) => {
   const url = new URL(req.url);
   const tenantId = url.searchParams.get('tenant');
@@ -85,19 +119,15 @@ serve(async (req) => {
     console.log('Webhook verification request:', { mode, token, tenantId });
 
     if (mode === 'subscribe') {
-      // We need to verify against the tenant's verify token
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
       if (tenantId) {
-        const { data: tenant } = await supabase
-          .from('tenants')
-          .select('meta_webhook_verify_token')
-          .eq('id', tenantId)
-          .single();
-
-        if (tenant?.meta_webhook_verify_token === token) {
+        // Get verify token from secure tenant_credentials table only
+        const verifyToken = await getVerifyToken(supabase, tenantId);
+        
+        if (verifyToken && verifyToken === token) {
           console.log('Webhook verified for tenant:', tenantId);
           return new Response(challenge, { status: 200 });
         }
@@ -138,29 +168,11 @@ serve(async (req) => {
         return new Response('Missing signature header', { status: 401 });
       }
 
-      // Get app secret from secure tenant_credentials table or global fallback
+      // Get app secret from secure tenant_credentials table only
       let appSecret: string | null = null;
       
       if (tenantId) {
-        // First try secure tenant_credentials table
-        const { data: credentials } = await supabase
-          .from('tenant_credentials')
-          .select('meta_app_secret')
-          .eq('tenant_id', tenantId)
-          .single();
-        
-        appSecret = credentials?.meta_app_secret || null;
-        
-        // Fallback to tenants table for backwards compatibility
-        if (!appSecret) {
-          const { data: tenant } = await supabase
-            .from('tenants')
-            .select('meta_app_secret')
-            .eq('id', tenantId)
-            .single();
-          
-          appSecret = tenant?.meta_app_secret || null;
-        }
+        appSecret = await getAppSecret(supabase, tenantId);
       }
       
       // Fallback to global app secret if tenant-specific not available

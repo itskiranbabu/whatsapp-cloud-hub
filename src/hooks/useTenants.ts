@@ -21,13 +21,15 @@ export const useTenants = () => {
 
     try {
       setIsLoading(true);
+      // Use the tenants_safe view to avoid exposing sensitive credentials
       const { data, error: fetchError } = await supabase
-        .from('tenants')
+        .from('tenants_safe')
         .select('*')
         .order('name');
 
       if (fetchError) throw fetchError;
-      setTenants(data || []);
+      // Cast to Tenant type since tenants_safe has same structure minus sensitive fields
+      setTenants((data || []) as unknown as Tenant[]);
     } catch (err) {
       console.error('Error fetching tenants:', err);
       setError(err as Error);
