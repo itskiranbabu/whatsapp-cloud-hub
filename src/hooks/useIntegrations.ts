@@ -4,6 +4,7 @@ import { useTenants } from "./useTenants";
 import { useToast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
 
+// Safe integration type for reading - excludes sensitive credentials column
 export interface Integration {
   id: string;
   tenant_id: string;
@@ -11,14 +12,24 @@ export interface Integration {
   name: string;
   status: "connected" | "disconnected" | "pending" | "error";
   config: Json;
-  credentials: Json;
   last_sync_at?: string;
   error_message?: string;
   created_at: string;
   updated_at: string;
 }
 
-export type IntegrationInsert = Omit<Integration, "id" | "tenant_id" | "created_at" | "updated_at">;
+// Full integration type including credentials - only used server-side
+export interface IntegrationWithCredentials extends Integration {
+  credentials: Json;
+}
+
+export type IntegrationInsert = {
+  integration_type: string;
+  name: string;
+  status?: "connected" | "disconnected" | "pending" | "error";
+  config?: Json;
+  credentials?: Json;
+};
 
 // Available integrations catalog
 export const integrationsCatalog = [
@@ -135,8 +146,9 @@ export const useIntegrations = () => {
     queryFn: async () => {
       if (!currentTenantId) return [];
 
+      // Use the integrations_safe view to avoid exposing credentials
       const { data, error } = await supabase
-        .from("integrations")
+        .from("integrations_safe")
         .select("*")
         .eq("tenant_id", currentTenantId)
         .order("created_at", { ascending: false });
