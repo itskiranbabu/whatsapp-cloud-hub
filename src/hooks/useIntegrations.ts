@@ -23,12 +23,13 @@ export interface IntegrationWithCredentials extends Integration {
   credentials: Json;
 }
 
+// Client-safe integration insert - credentials must be handled server-side
 export type IntegrationInsert = {
   integration_type: string;
   name: string;
   status?: "connected" | "disconnected" | "pending" | "error";
   config?: Json;
-  credentials?: Json;
+  // Note: credentials are intentionally excluded - must use edge functions for OAuth
 };
 
 // Available integrations catalog
@@ -163,16 +164,17 @@ export const useIntegrations = () => {
     mutationFn: async ({ 
       integrationType, 
       name, 
-      config = {}, 
-      credentials = {} 
+      config = {},
     }: { 
       integrationType: string; 
       name: string; 
       config?: Json;
-      credentials?: Json;
+      // Note: credentials parameter removed - must use edge functions for secure credential storage
     }) => {
       if (!currentTenantId) throw new Error("No tenant selected");
 
+      // OAuth-based integrations requiring credentials MUST use edge functions
+      // This client hook only handles config-only integrations (webhooks, simple connections)
       const { data, error } = await supabase
         .from("integrations")
         .upsert([{
@@ -181,7 +183,7 @@ export const useIntegrations = () => {
           name,
           status: "connected" as const,
           config: config as Json,
-          credentials: credentials as Json,
+          // credentials intentionally omitted - RLS will reject if present
           last_sync_at: new Date().toISOString(),
         }], {
           onConflict: 'tenant_id,integration_type'
