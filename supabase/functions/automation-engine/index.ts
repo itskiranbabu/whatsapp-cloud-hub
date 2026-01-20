@@ -41,13 +41,28 @@ function getNextNodes(nodeId: string, edges: FlowEdge[]): string[] {
   return edges.filter((e) => e.source === nodeId).map((e) => e.target);
 }
 
+// Validate variable names to prevent ReDoS attacks - only allow alphanumeric and underscore
+function isValidVariableName(name: string): boolean {
+  return /^[a-zA-Z0-9_]+$/.test(name);
+}
+
 function replaceVariables(text: string, context: ExecutionContext): string {
   if (!text) return text;
   let result = text;
-  result = result.replace(/{{contact_name}}/g, context.contactName || "");
-  result = result.replace(/{{contact_phone}}/g, context.contactPhone || "");
+  
+  // Replace built-in variables using safe string split/join method
+  result = result.split("{{contact_name}}").join(context.contactName || "");
+  result = result.split("{{contact_phone}}").join(context.contactPhone || "");
+  
+  // Replace custom variables using safe string split/join method (no regex)
   Object.entries(context.variables).forEach(([key, value]) => {
-    result = result.replace(new RegExp(`{{${key}}}`, "g"), String(value));
+    // Validate variable name to prevent malicious patterns
+    if (!isValidVariableName(key)) {
+      console.warn(`Skipping invalid variable name: ${key}`);
+      return;
+    }
+    const placeholder = `{{${key}}}`;
+    result = result.split(placeholder).join(String(value));
   });
   return result;
 }
