@@ -204,10 +204,10 @@ serve(async (req) => {
       throw new Error('Access denied to this tenant');
     }
 
-    // Get tenant with Meta credentials
+    // Get tenant basic info (non-sensitive)
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('*')
+      .select('id, phone_number_id, bsp_provider')
       .eq('id', tenant_id)
       .single();
 
@@ -215,8 +215,29 @@ serve(async (req) => {
       throw new Error('Tenant not found');
     }
 
-    // Check if Meta Direct is configured
-    if (!tenant.phone_number_id || !tenant.meta_access_token) {
+    if (!tenant.phone_number_id) {
+      throw new Error('Meta Cloud API not configured for this tenant. Please configure your Meta credentials.');
+    }
+
+    // Get credentials from secure tenant_credentials table (service role bypasses RLS)
+    const { data: credentials, error: credentialsError } = await supabase
+      .from('tenant_credentials')
+      .select('meta_access_token')
+      .eq('tenant_id', tenant_id)
+      .single();
+
+    // Fallback to tenants table for backwards compatibility during migration
+    let accessToken = credentials?.meta_access_token;
+    if (!accessToken) {
+      const { data: tenantCreds } = await supabase
+        .from('tenants')
+        .select('meta_access_token')
+        .eq('id', tenant_id)
+        .single();
+      accessToken = tenantCreds?.meta_access_token;
+    }
+
+    if (!accessToken) {
       throw new Error('Meta Cloud API not configured for this tenant. Please configure your Meta credentials.');
     }
 
@@ -260,7 +281,7 @@ serve(async (req) => {
         case 'text':
           result = await sendTextMessage(
             tenant.phone_number_id,
-            tenant.meta_access_token,
+            accessToken,
             phone,
             body.content!
           );
@@ -269,7 +290,7 @@ serve(async (req) => {
         case 'template':
           result = await sendTemplateMessage(
             tenant.phone_number_id,
-            tenant.meta_access_token,
+            accessToken,
             phone,
             body.template_name!,
             body.template_language || 'en',
@@ -283,7 +304,7 @@ serve(async (req) => {
         case 'audio':
           result = await sendMediaMessage(
             tenant.phone_number_id,
-            tenant.meta_access_token,
+            accessToken,
             phone,
             message_type,
             body.media_url!,

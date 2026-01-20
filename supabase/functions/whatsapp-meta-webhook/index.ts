@@ -138,17 +138,29 @@ serve(async (req) => {
         return new Response('Missing signature header', { status: 401 });
       }
 
-      // Get app secret from tenant or global fallback
+      // Get app secret from secure tenant_credentials table or global fallback
       let appSecret: string | null = null;
       
       if (tenantId) {
-        const { data: tenant } = await supabase
-          .from('tenants')
+        // First try secure tenant_credentials table
+        const { data: credentials } = await supabase
+          .from('tenant_credentials')
           .select('meta_app_secret')
-          .eq('id', tenantId)
+          .eq('tenant_id', tenantId)
           .single();
         
-        appSecret = tenant?.meta_app_secret || null;
+        appSecret = credentials?.meta_app_secret || null;
+        
+        // Fallback to tenants table for backwards compatibility
+        if (!appSecret) {
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('meta_app_secret')
+            .eq('id', tenantId)
+            .single();
+          
+          appSecret = tenant?.meta_app_secret || null;
+        }
       }
       
       // Fallback to global app secret if tenant-specific not available

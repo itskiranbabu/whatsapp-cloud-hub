@@ -937,6 +937,47 @@ export type Database = {
           },
         ]
       }
+      tenant_credentials: {
+        Row: {
+          bsp_credentials: Json | null
+          created_at: string | null
+          id: string
+          meta_access_token: string | null
+          meta_app_secret: string | null
+          meta_webhook_verify_token: string | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          bsp_credentials?: Json | null
+          created_at?: string | null
+          id?: string
+          meta_access_token?: string | null
+          meta_app_secret?: string | null
+          meta_webhook_verify_token?: string | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          bsp_credentials?: Json | null
+          created_at?: string | null
+          id?: string
+          meta_access_token?: string | null
+          meta_app_secret?: string | null
+          meta_webhook_verify_token?: string | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_credentials_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_partners: {
         Row: {
           created_at: string

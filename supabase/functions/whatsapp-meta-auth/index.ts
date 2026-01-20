@@ -333,12 +333,13 @@ serve(async (req) => {
 
       // Step 4: Update tenant with Meta credentials
       console.log('Step 4: Updating tenant with credentials...');
+      
+      // Update non-sensitive info in tenants table
       const { error: updateError } = await supabase
         .from('tenants')
         .update({
           waba_id: primaryWaba.id,
           phone_number_id: primaryPhone.id,
-          meta_access_token: longLivedToken.access_token,
           bsp_provider: 'meta_direct',
           business_name: primaryPhone.verified_name || primaryWaba.name,
           updated_at: new Date().toISOString(),
@@ -351,6 +352,24 @@ serve(async (req) => {
           JSON.stringify({ success: false, error: 'Failed to save credentials to database' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Store sensitive credentials in secure tenant_credentials table
+      const { error: credError } = await supabase
+        .from('tenant_credentials')
+        .upsert({
+          tenant_id: tenant_id,
+          meta_access_token: longLivedToken.access_token,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'tenant_id' });
+
+      if (credError) {
+        console.error('Failed to save secure credentials:', credError);
+        // Also save to tenants table as fallback for backwards compatibility
+        await supabase
+          .from('tenants')
+          .update({ meta_access_token: longLivedToken.access_token })
+          .eq('id', tenant_id);
       }
 
       console.log('Successfully connected Meta Direct for tenant:', tenant_id);
@@ -380,11 +399,30 @@ serve(async (req) => {
       // Debug existing connection
       const { data: tenant, error } = await supabase
         .from('tenants')
-        .select('waba_id, phone_number_id, meta_access_token, bsp_provider, business_name')
+        .select('waba_id, phone_number_id, bsp_provider, business_name')
         .eq('id', tenant_id)
         .single();
 
-      if (error || !tenant?.meta_access_token) {
+      // Get access token from secure table first, fallback to tenants
+      let accessToken: string | null = null;
+      const { data: credentials } = await supabase
+        .from('tenant_credentials')
+        .select('meta_access_token')
+        .eq('tenant_id', tenant_id)
+        .single();
+      
+      accessToken = credentials?.meta_access_token || null;
+      
+      if (!accessToken) {
+        const { data: tenantCreds } = await supabase
+          .from('tenants')
+          .select('meta_access_token')
+          .eq('id', tenant_id)
+          .single();
+        accessToken = tenantCreds?.meta_access_token;
+      }
+
+      if (error || !accessToken) {
         return new Response(
           JSON.stringify({ success: false, error: 'No Meta connection found for this tenant' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -392,7 +430,7 @@ serve(async (req) => {
       }
 
       try {
-        const debugInfo = await debugToken(tenant.meta_access_token);
+        const debugInfo = await debugToken(accessToken);
         return new Response(
           JSON.stringify({
             success: true,
@@ -426,6 +464,17 @@ serve(async (req) => {
     }
 
     if (action === 'disconnect') {
+      // Clear credentials from both tables
+      await supabase
+        .from('tenant_credentials')
+        .update({
+          meta_access_token: null,
+          meta_app_secret: null,
+          meta_webhook_verify_token: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenant_id);
+
       const { error: updateError } = await supabase
         .from('tenants')
         .update({
