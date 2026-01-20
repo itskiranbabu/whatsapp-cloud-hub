@@ -297,46 +297,47 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
 
     try {
       const handleLoginResponse = (response: any) => {
-        // IMPORTANT: FB SDK can reject async callbacks; keep this callback synchronous.
-        void (async () => {
-          console.log('Facebook login response:', response);
+        // CRITICAL: Meta/Facebook SDK can throw if you pass an async function.
+        // Keep *everything* here strictly synchronous (no async/await anywhere).
+        console.log("Facebook login response:", response);
 
-          if (response?.authResponse?.code) {
-            // Exchange the code for access token via our backend function
-            try {
-              toast({
-                title: "Processing...",
-                description: "Connecting your WhatsApp Business Account...",
-              });
+        if (response?.authResponse?.code) {
+          toast({
+            title: "Processing...",
+            description: "Connecting your WhatsApp Business Account...",
+          });
 
-              const { data, error } = await supabase.functions.invoke("whatsapp-meta-auth", {
-                body: {
-                  action: "exchange_code",
-                  code: response.authResponse.code,
-                  tenant_id: currentTenant.id,
-                  redirect_uri: window.location.origin + window.location.pathname,
-                },
-              });
-
+          supabase.functions
+            .invoke("whatsapp-meta-auth", {
+              body: {
+                action: "exchange_code",
+                code: response.authResponse.code,
+                tenant_id: currentTenant.id,
+                redirect_uri: window.location.origin + window.location.pathname,
+              },
+            })
+            .then(({ data, error }) => {
               if (error) {
-                console.error('Exchange error:', error);
-                throw new Error(error.message || 'Failed to exchange authorization code');
+                console.error("Exchange error:", error);
+                throw new Error(error.message || "Failed to exchange authorization code");
               }
 
-              if (data?.success) {
-                setIsConnected(true);
-                setConnectionDetails({
-                  wabaId: data.waba_id,
-                  phoneNumberId: data.phone_number_id,
-                  businessName: data.verified_name || data.waba_name,
-                  displayPhoneNumber: data.display_phone_number,
-                });
-                setConnectionStatus({ isValid: true });
+              if (!data?.success) {
+                throw new Error(data?.error || "Failed to complete WhatsApp setup");
+              }
 
-                await refetch();
+              setIsConnected(true);
+              setConnectionDetails({
+                wabaId: data.waba_id,
+                phoneNumberId: data.phone_number_id,
+                businessName: data.verified_name || data.waba_name,
+                displayPhoneNumber: data.display_phone_number,
+              });
+              setConnectionStatus({ isValid: true });
 
+              return Promise.resolve(refetch()).then(() => {
                 toast({
-                  title: "WhatsApp Connected! 🎉",
+                  title: "WhatsApp Connected!",
                   description: `Connected to ${data.verified_name || data.waba_name} (${data.display_phone_number})`,
                 });
 
@@ -346,11 +347,10 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
                   displayPhoneNumber: data.display_phone_number,
                   verifiedName: data.verified_name,
                 });
-              } else {
-                throw new Error(data?.error || "Failed to complete WhatsApp setup");
-              }
-            } catch (err) {
-              console.error('Connection error:', err);
+              });
+            })
+            .catch((err) => {
+              console.error("Connection error:", err);
               const message = err instanceof Error ? err.message : "Failed to complete signup";
               toast({
                 title: "Connection Failed",
@@ -358,25 +358,32 @@ export const MetaEmbeddedSignup = ({ onSuccess, onError }: MetaEmbeddedSignupPro
                 variant: "destructive",
               });
               onError?.(message);
-            }
-          } else if (response?.status === 'unknown') {
-            toast({
-              title: "Popup Blocked",
-              description: "Please allow popups and try again, or check if you cancelled the signup.",
-              variant: "destructive",
+            })
+            .finally(() => {
+              setIsLoading(false);
             });
-            onError?.("Popup blocked or cancelled");
-          } else {
-            toast({
-              title: "Signup Cancelled",
-              description: "WhatsApp Business signup was cancelled",
-              variant: "destructive",
-            });
-            onError?.("User cancelled signup");
-          }
 
+          return;
+        }
+
+        if (response?.status === "unknown") {
+          toast({
+            title: "Popup Blocked",
+            description: "Please allow popups and try again, or check if you cancelled the signup.",
+            variant: "destructive",
+          });
+          onError?.("Popup blocked or cancelled");
           setIsLoading(false);
-        })();
+          return;
+        }
+
+        toast({
+          title: "Signup Cancelled",
+          description: "WhatsApp Business signup was cancelled",
+          variant: "destructive",
+        });
+        onError?.("User cancelled signup");
+        setIsLoading(false);
       };
 
       window.FB.login(handleLoginResponse, {
