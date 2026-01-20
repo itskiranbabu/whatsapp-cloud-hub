@@ -1146,7 +1146,53 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      integrations_safe: {
+        Row: {
+          config: Json | null
+          created_at: string | null
+          error_message: string | null
+          id: string | null
+          integration_type: string | null
+          last_sync_at: string | null
+          name: string | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string | null
+          integration_type?: string | null
+          last_sync_at?: string | null
+          name?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string | null
+          integration_type?: string | null
+          last_sync_at?: string | null
+          name?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_user_tenant_ids: { Args: { _user_id: string }; Returns: string[] }
