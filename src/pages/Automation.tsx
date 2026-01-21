@@ -8,6 +8,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Plus,
@@ -21,11 +23,13 @@ import {
   Settings,
   MoreVertical,
   TrendingUp,
-  Users,
   ArrowRight,
   ArrowLeft,
   Loader2,
   Trash2,
+  FlaskConical,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,18 +40,29 @@ import {
 import { FlowBuilder } from "@/components/automation/FlowBuilder";
 import { ContextualHelp } from "@/components/help/ContextualHelp";
 import { useAutomations } from "@/hooks/useAutomations";
+import { useAutomationExecution } from "@/hooks/useAutomationExecution";
+import { useTenantRealtimeSubscriptions } from "@/hooks/useRealtimeSubscription";
+import { useTenants } from "@/hooks/useTenants";
 import { useToast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
 import type { FlowNode } from "@/components/automation/FlowBuilder";
 
 const Automation = () => {
   const { automations, isLoading, createAutomation, updateAutomation, toggleAutomation, deleteAutomation } = useAutomations();
+  const { testAutomation, executeAutomation } = useAutomationExecution();
+  const { currentTenantId } = useTenants();
   const { toast } = useToast();
+  
+  // Enable real-time updates for automations
+  useTenantRealtimeSubscriptions(currentTenantId);
   
   const [showFlowBuilder, setShowFlowBuilder] = useState(false);
   const [editingAutomation, setEditingAutomation] = useState<string | null>(null);
   const [flowName, setFlowName] = useState("New Automation");
   const [flowNodes, setFlowNodes] = useState<FlowNode[]>([]);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [testingAutomationId, setTestingAutomationId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const activeAutomations = automations.filter(a => a.is_active);
   const totalExecutions = automations.reduce((sum, a) => sum + (a.executions_count || 0), 0);
@@ -102,11 +117,47 @@ const Automation = () => {
     }
   };
 
-  const handleTestFlow = () => {
-    toast({
-      title: "Test Mode",
-      description: "Flow testing will simulate the automation without sending real messages.",
-    });
+  const handleTestFlow = async () => {
+    if (!editingAutomation) {
+      toast({
+        title: "Save First",
+        description: "Please save the automation before testing.",
+      });
+      return;
+    }
+    
+    setTestingAutomationId(editingAutomation);
+    setTestResult(null);
+    setTestDialogOpen(true);
+    
+    try {
+      const result = await testAutomation.mutateAsync({
+        automationId: editingAutomation,
+      });
+      
+      setTestResult({
+        success: result.success,
+        message: result.success 
+          ? `Flow validated successfully. ${result.nodes_processed} nodes would be processed.`
+          : result.error || "Test failed",
+      });
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: error instanceof Error ? error.message : "Test failed",
+      });
+    }
+  };
+
+  const handleRunAutomation = async (automationId: string) => {
+    try {
+      await executeAutomation.mutateAsync({
+        automationId,
+        triggerData: { manual: true },
+      });
+    } catch (error) {
+      console.error("Failed to run automation:", error);
+    }
   };
 
   const handleToggleStatus = async (automationId: string, currentStatus: boolean) => {
@@ -300,6 +351,13 @@ const Automation = () => {
                               Edit Flow
                             </DropdownMenuItem>
                             <DropdownMenuItem 
+                              onClick={() => handleRunAutomation(automation.id)}
+                              disabled={!automation.is_active}
+                            >
+                              <FlaskConical className="w-4 h-4 mr-2" />
+                              Run Now
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
                               onClick={() => handleToggleStatus(automation.id, automation.is_active || false)}
                             >
                               {automation.is_active ? (
@@ -390,6 +448,45 @@ const Automation = () => {
           </div>
         )}
       </motion.div>
+
+      {/* Test Result Dialog */}
+      <Dialog open={testDialogOpen} onOpenChange={setTestDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FlaskConical className="w-5 h-5" />
+              Automation Test
+            </DialogTitle>
+            <DialogDescription>
+              Validate your automation flow without sending real messages.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6">
+            {testAutomation.isPending ? (
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-muted-foreground">Testing automation...</p>
+              </div>
+            ) : testResult ? (
+              <div className="flex flex-col items-center gap-4">
+                {testResult.success ? (
+                  <CheckCircle className="w-12 h-12 text-primary" />
+                ) : (
+                  <XCircle className="w-12 h-12 text-destructive" />
+                )}
+                <p className={testResult.success ? "text-foreground" : "text-destructive"}>
+                  {testResult.message}
+                </p>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
