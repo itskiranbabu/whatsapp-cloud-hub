@@ -8,6 +8,7 @@ import { APIStatusCard } from "@/components/dashboard/APIStatusCard";
 import { OnboardingProgress } from "@/components/dashboard/OnboardingProgress";
 import { BusinessProfileCard } from "@/components/dashboard/BusinessProfileCard";
 import { CreditsCard } from "@/components/dashboard/CreditsCard";
+import { QuotaStatusCard } from "@/components/dashboard/QuotaStatusCard";
 import { GettingStartedGuide } from "@/components/help/GettingStartedGuide";
 import { MessageSquare, Users, Send, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
@@ -15,12 +16,16 @@ import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { useTenants } from "@/hooks/useTenants";
 import { useContacts } from "@/hooks/useContacts";
 import { useTemplates } from "@/hooks/useTemplates";
+import { useTenantRealtimeSubscriptions } from "@/hooks/useRealtimeSubscription";
 
 const Index = () => {
   const { data, isLoading } = useDashboardMetrics();
-  const { tenants } = useTenants();
+  const { tenants, currentTenantId } = useTenants();
   const { contacts } = useContacts();
   const { templates } = useTemplates();
+
+  // Enable real-time subscriptions for all tenant data
+  useTenantRealtimeSubscriptions(currentTenantId);
 
   // Determine completed prerequisites based on data
   const hasWhatsAppConnected = tenants.some(t => t.waba_id || t.phone_number_id);
@@ -117,6 +122,7 @@ const Index = () => {
           {/* Right Sidebar */}
           <div className="space-y-6">
             <BusinessProfileCard />
+            <QuotaStatusCard />
             <CreditsCard />
           </div>
         </div>
