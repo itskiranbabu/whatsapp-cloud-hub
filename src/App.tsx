@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { PartnerProvider } from "@/contexts/PartnerContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Inbox from "./pages/Inbox";
@@ -45,12 +46,13 @@ const queryClient = new QueryClient({
 
 const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             <PartnerProvider>
             <AuthProvider>
             <Routes>
@@ -185,11 +187,12 @@ const App: React.FC = () => {
             </Routes>
             <AIAssistant />
             </AuthProvider>
-            </PartnerProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </LanguageProvider>
-    </QueryClientProvider>
+              </PartnerProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </LanguageProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 

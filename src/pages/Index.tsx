@@ -9,6 +9,7 @@ import { OnboardingProgress } from "@/components/dashboard/OnboardingProgress";
 import { BusinessProfileCard } from "@/components/dashboard/BusinessProfileCard";
 import { CreditsCard } from "@/components/dashboard/CreditsCard";
 import { QuotaStatusCard } from "@/components/dashboard/QuotaStatusCard";
+import { SystemHealthCard } from "@/components/dashboard/SystemHealthCard";
 import { GettingStartedGuide } from "@/components/help/GettingStartedGuide";
 import { MessageSquare, Users, Send, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
@@ -121,6 +122,7 @@ const Index = () => {
 
           {/* Right Sidebar */}
           <div className="space-y-6">
+            <SystemHealthCard />
             <BusinessProfileCard />
             <QuotaStatusCard />
             <CreditsCard />

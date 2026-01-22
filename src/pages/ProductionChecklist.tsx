@@ -104,6 +104,15 @@ const ProductionChecklist = () => {
           category: "Contacts",
           action: { label: "Import Contacts", path: "/contacts" },
         },
+        {
+          id: "contacts-opted-in",
+          title: "Opt-In Consent Collected",
+          description: "Ensure contacts have opted in for messaging",
+          status: contacts.some(c => c.opted_in) ? "completed" : 
+                  contacts.length > 0 ? "warning" : "pending",
+          category: "Contacts",
+          action: { label: "Manage Contacts", path: "/contacts" },
+        },
         
         // Automation
         {
@@ -133,6 +142,24 @@ const ProductionChecklist = () => {
           category: "Settings",
           action: { label: "Configure", path: "/settings" },
         },
+        {
+          id: "branding-setup",
+          title: "Branding Customized",
+          description: "Add your logo and brand colors",
+          status: tenant?.logo_url || tenant?.primary_color !== "#25D366" ? "completed" : "pending",
+          category: "Settings",
+          action: { label: "Customize", path: "/settings" },
+        },
+        
+        // Billing
+        {
+          id: "billing-configured",
+          title: "Billing Information",
+          description: "Configure payment method for production usage",
+          status: "pending", // Will be updated when Razorpay is integrated
+          category: "Billing",
+          action: { label: "Setup Billing", path: "/settings" },
+        },
         
         // Security
         {
@@ -140,6 +167,13 @@ const ProductionChecklist = () => {
           title: "Authentication Enabled",
           description: "User authentication is configured",
           status: "completed", // Always true if they're logged in
+          category: "Security",
+        },
+        {
+          id: "team-roles",
+          title: "Team Roles Configured",
+          description: "Set up proper access controls for team members",
+          status: "completed", // RLS is always active
           category: "Security",
         },
       ];
