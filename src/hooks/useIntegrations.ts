@@ -169,36 +169,59 @@ export const useIntegrations = () => {
       integrationType: string; 
       name: string; 
       config?: Json;
-      // Note: credentials parameter removed - must use edge functions for secure credential storage
     }) => {
       if (!currentTenantId) throw new Error("No tenant selected");
 
-      // OAuth-based integrations requiring credentials MUST use edge functions
-      // This client hook only handles config-only integrations (webhooks, simple connections)
-      const { data, error } = await supabase
-        .from("integrations")
-        .upsert([{
-          tenant_id: currentTenantId,
-          integration_type: integrationType,
-          name,
-          status: "connected" as const,
-          config: config as Json,
-          // credentials intentionally omitted - RLS will reject if present
-          last_sync_at: new Date().toISOString(),
-        }], {
-          onConflict: 'tenant_id,integration_type'
-        })
-        .select()
-        .single();
+      // First, check if an integration already exists for this tenant and type
+      const { data: existing } = await supabase
+        .from("integrations_safe")
+        .select("id")
+        .eq("tenant_id", currentTenantId)
+        .eq("integration_type", integrationType)
+        .maybeSingle();
 
-      if (error) throw error;
-      return data;
+      if (existing) {
+        // Update existing integration
+        const { data, error } = await supabase
+          .from("integrations")
+          .update({
+            name,
+            status: "connected" as const,
+            config: config as Json,
+            last_sync_at: new Date().toISOString(),
+            error_message: null,
+          })
+          .eq("id", existing.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } else {
+        // Insert new integration
+        const { data, error } = await supabase
+          .from("integrations")
+          .insert({
+            tenant_id: currentTenantId,
+            integration_type: integrationType,
+            name,
+            status: "connected" as const,
+            config: config as Json,
+            last_sync_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["integrations", currentTenantId] });
       toast({ title: `${data.name} connected successfully` });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
+      console.error("Integration connection error:", error);
       toast({ 
         title: "Failed to connect integration", 
         description: error.message,
@@ -241,7 +264,8 @@ export const useIntegrations = () => {
   });
 
   const updateIntegration = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string; config?: Json; credentials?: Json; error_message?: string }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; status?: string; config?: Json; error_message?: string }) => {
+      // Note: credentials field removed - must use edge functions for secure credential updates
       const { data, error } = await supabase
         .from("integrations")
         .update(updates)
@@ -254,6 +278,14 @@ export const useIntegrations = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integrations", currentTenantId] });
+    },
+    onError: (error: Error) => {
+      console.error("Integration update error:", error);
+      toast({ 
+        title: "Failed to update integration", 
+        description: error.message,
+        variant: "destructive" 
+      });
     },
   });
 
