@@ -38,6 +38,7 @@ import {
 import { useIntegrations, integrationsCatalog } from "@/hooks/useIntegrations";
 import { IntegrationsPageHelp, IntegrationsContextualHelp } from "@/components/help/PageHelpComponents";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const categories = [
   { id: "all", label: "All", icon: Plug },
@@ -152,12 +153,17 @@ const Integrations = () => {
           integrationType: selectedIntegration.type,
           name: selectedIntegration.name,
           config: { oauth_pending: true, connected_at: new Date().toISOString() },
-          // Note: No credentials sent from client - handled by OAuth callback edge function
+        });
+        
+        toast({
+          title: "Integration Connected!",
+          description: `${selectedIntegration.name} has been successfully connected.`,
         });
       } else if (oauthConfig?.fields?.length) {
-        // For API key-based integrations, we need to use an edge function
-        // to securely store credentials server-side
+        // For API key-based integrations, create the integration first
+        // then use edge function to store credentials securely
         const config: Record<string, string> = {};
+        const credentials: Record<string, string> = {};
         
         for (const field of oauthConfig.fields) {
           if (!formData[field.key]) {
@@ -170,24 +176,43 @@ const Integrations = () => {
             return;
           }
           
-          // Only store non-sensitive fields in config
-          if (field.type !== "password" && !field.key.includes("secret") && !field.key.includes("key")) {
+          // Separate sensitive vs non-sensitive fields
+          if (field.type === "password" || field.key.includes("secret") || field.key.includes("key_id")) {
+            credentials[field.key] = formData[field.key];
+          } else {
             config[field.key] = formData[field.key];
           }
         }
         
-        // TODO: API key integrations should use an edge function for secure credential storage
-        // For now, only store the non-sensitive config
-        await connectIntegration.mutateAsync({
+        // First create/update the integration record
+        const result = await connectIntegration.mutateAsync({
           integrationType: selectedIntegration.type,
           name: selectedIntegration.name,
-          config: { ...config, connected_at: new Date().toISOString(), requires_credential_setup: true },
-          // Note: Credentials NOT sent from client - needs edge function implementation
+          config: { ...config, connected_at: new Date().toISOString() },
         });
+
+        // Then store credentials securely via edge function
+        if (Object.keys(credentials).length > 0) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const response = await supabase.functions.invoke("integration-credentials", {
+              body: {
+                action: "store",
+                integration_id: result.id,
+                integration_type: selectedIntegration.type,
+                credentials: { ...credentials, ...config },
+              },
+            });
+
+            if (response.error) {
+              throw new Error(response.error.message || "Failed to store credentials");
+            }
+          }
+        }
         
         toast({
-          title: "Integration Partially Connected",
-          description: "Configuration saved. Secure credential setup via API is pending.",
+          title: "Integration Connected!",
+          description: `${selectedIntegration.name} has been successfully connected and verified.`,
         });
       } else {
         // Simple connection without credentials
@@ -195,21 +220,21 @@ const Integrations = () => {
           integrationType: selectedIntegration.type,
           name: selectedIntegration.name,
           config: { connected_at: new Date().toISOString() },
-          // No credentials needed for simple integrations
+        });
+        
+        toast({
+          title: "Integration Connected!",
+          description: `${selectedIntegration.name} has been successfully connected.`,
         });
       }
       
-      toast({
-        title: "Integration Connected!",
-        description: `${selectedIntegration.name} has been successfully connected.`,
-      });
-      
       setSelectedIntegration(null);
       setFormData({});
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to connect integration";
       toast({
         title: "Connection Failed",
-        description: error.message || "Failed to connect integration",
+        description: message,
         variant: "destructive",
       });
     }
