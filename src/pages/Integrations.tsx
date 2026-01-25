@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,12 +34,12 @@ import {
   Zap,
   AlertCircle,
   Settings,
-  RefreshCw,
 } from "lucide-react";
 import { useIntegrations, integrationsCatalog } from "@/hooks/useIntegrations";
 import { IntegrationsPageHelp, IntegrationsContextualHelp } from "@/components/help/PageHelpComponents";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenants } from "@/hooks/useTenants";
 
 const categories = [
   { id: "all", label: "All", icon: Plug },
@@ -50,67 +51,59 @@ const categories = [
   { id: "ai", label: "AI & Bots", icon: Bot },
 ];
 
-// OAuth configurations for real integrations
-const oauthConfigs: Record<string, { 
-  authUrl: string; 
-  scopes: string[]; 
-  fields?: { key: string; label: string; type: string; placeholder: string }[];
+// OAuth providers that use real OAuth flow
+const oauthProviders = ["google_sheets", "hubspot", "zoho_crm", "calendly"];
+
+// API key/credential-based configurations
+const credentialConfigs: Record<string, { 
+  fields: { key: string; label: string; type: string; placeholder: string }[];
 }> = {
   shopify: {
-    authUrl: "https://accounts.shopify.com/oauth/authorize",
-    scopes: ["read_orders", "write_orders", "read_products", "read_customers"],
     fields: [
-      { key: "shop_domain", label: "Shop Domain", type: "text", placeholder: "yourstore.myshopify.com" }
+      { key: "shop_domain", label: "Shop Domain", type: "text", placeholder: "yourstore.myshopify.com" },
+      { key: "access_token", label: "Access Token", type: "password", placeholder: "shpat_xxx..." },
     ],
   },
   razorpay: {
-    authUrl: "",
-    scopes: [],
     fields: [
       { key: "key_id", label: "API Key ID", type: "text", placeholder: "rzp_live_xxx..." },
       { key: "key_secret", label: "API Key Secret", type: "password", placeholder: "Your Razorpay secret key" },
     ],
   },
-  google_sheets: {
-    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-    scopes: ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.readonly"],
-    fields: [],
-  },
   zapier: {
-    authUrl: "",
-    scopes: [],
     fields: [
       { key: "webhook_url", label: "Zapier Webhook URL", type: "text", placeholder: "https://hooks.zapier.com/hooks/catch/..." },
     ],
   },
-  hubspot: {
-    authUrl: "https://app.hubspot.com/oauth/authorize",
-    scopes: ["contacts", "crm.objects.contacts.read", "crm.objects.contacts.write"],
-    fields: [],
-  },
-  zoho_crm: {
-    authUrl: "https://accounts.zoho.com/oauth/v2/auth",
-    scopes: ["ZohoCRM.modules.ALL", "ZohoCRM.settings.ALL"],
-    fields: [],
-  },
   woocommerce: {
-    authUrl: "",
-    scopes: [],
     fields: [
       { key: "site_url", label: "WooCommerce Site URL", type: "text", placeholder: "https://yourstore.com" },
       { key: "consumer_key", label: "Consumer Key", type: "text", placeholder: "ck_xxx..." },
       { key: "consumer_secret", label: "Consumer Secret", type: "password", placeholder: "cs_xxx..." },
     ],
   },
+  make: {
+    fields: [
+      { key: "webhook_url", label: "Make Webhook URL", type: "text", placeholder: "https://hook.make.com/..." },
+    ],
+  },
+  dialogflow: {
+    fields: [
+      { key: "project_id", label: "Project ID", type: "text", placeholder: "your-dialogflow-project" },
+      { key: "credentials_json", label: "Service Account JSON", type: "password", placeholder: "Paste your service account JSON" },
+    ],
+  },
 };
 
 const Integrations = () => {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedIntegration, setSelectedIntegration] = useState<typeof integrationsCatalog[0] | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const { currentTenantId } = useTenants();
   
   const { 
     allIntegrations, 
@@ -119,6 +112,29 @@ const Integrations = () => {
     connectIntegration,
     disconnectIntegration,
   } = useIntegrations();
+
+  // Handle OAuth callback success/error messages
+  useEffect(() => {
+    const connectedProvider = searchParams.get("connected");
+    const errorMessage = searchParams.get("error");
+
+    if (connectedProvider) {
+      toast({
+        title: "Integration Connected!",
+        description: `${connectedProvider.replace("_", " ")} has been successfully connected.`,
+      });
+      setSearchParams({});
+    }
+
+    if (errorMessage) {
+      toast({
+        title: "Connection Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams, toast]);
 
   const filteredIntegrations = allIntegrations.filter((integration) => {
     const matchesSearch = 
@@ -129,43 +145,51 @@ const Integrations = () => {
   });
 
   const handleConnect = async () => {
-    if (!selectedIntegration) return;
+    if (!selectedIntegration || !currentTenantId) return;
     
     setIsConnecting(true);
     try {
-      const oauthConfig = oauthConfigs[selectedIntegration.type];
+      // Check if this is an OAuth provider
+      if (oauthProviders.includes(selectedIntegration.type)) {
+        // Initiate OAuth flow via edge function
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to connect integrations.",
+            variant: "destructive",
+          });
+          setIsConnecting(false);
+          return;
+        }
+
+        const response = await supabase.functions.invoke("oauth-initiate", {
+          body: {
+            provider: selectedIntegration.type,
+            tenant_id: currentTenantId,
+          },
+        });
+
+        if (response.error) {
+          throw new Error(response.error.message || "Failed to initiate OAuth");
+        }
+
+        if (response.data?.authorization_url) {
+          // Redirect to OAuth provider
+          window.location.href = response.data.authorization_url;
+          return;
+        }
+      }
       
-      // For OAuth-based integrations with external auth
-      if (oauthConfig?.authUrl) {
-        // OAuth integrations should redirect to the OAuth provider
-        // Credentials are handled server-side via edge functions after callback
-        toast({
-          title: "OAuth Integration",
-          description: `Redirecting to ${selectedIntegration.name} for authorization...`,
-        });
-        
-        // Simulate OAuth redirect - in production, redirect to OAuth provider
-        // The callback would be handled by an edge function that stores credentials securely
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Only store non-sensitive config - credentials handled server-side
-        await connectIntegration.mutateAsync({
-          integrationType: selectedIntegration.type,
-          name: selectedIntegration.name,
-          config: { oauth_pending: true, connected_at: new Date().toISOString() },
-        });
-        
-        toast({
-          title: "Integration Connected!",
-          description: `${selectedIntegration.name} has been successfully connected.`,
-        });
-      } else if (oauthConfig?.fields?.length) {
-        // For API key-based integrations, create the integration first
-        // then use edge function to store credentials securely
-        const config: Record<string, string> = {};
+      // For API key/credential-based integrations
+      const credConfig = credentialConfigs[selectedIntegration.type];
+      
+      if (credConfig?.fields?.length) {
+        // Validate all fields are filled
         const credentials: Record<string, string> = {};
+        const config: Record<string, string> = {};
         
-        for (const field of oauthConfig.fields) {
+        for (const field of credConfig.fields) {
           if (!formData[field.key]) {
             toast({
               title: "Missing Field",
@@ -177,7 +201,7 @@ const Integrations = () => {
           }
           
           // Separate sensitive vs non-sensitive fields
-          if (field.type === "password" || field.key.includes("secret") || field.key.includes("key_id")) {
+          if (field.type === "password" || field.key.includes("secret") || field.key.includes("key")) {
             credentials[field.key] = formData[field.key];
           } else {
             config[field.key] = formData[field.key];
@@ -212,7 +236,7 @@ const Integrations = () => {
         
         toast({
           title: "Integration Connected!",
-          description: `${selectedIntegration.name} has been successfully connected and verified.`,
+          description: `${selectedIntegration.name} has been successfully connected.`,
         });
       } else {
         // Simple connection without credentials
@@ -272,18 +296,17 @@ const Integrations = () => {
   const renderConnectionForm = () => {
     if (!selectedIntegration) return null;
     
-    const oauthConfig = oauthConfigs[selectedIntegration.type];
-    
     // OAuth-based integration
-    if (oauthConfig?.authUrl) {
+    if (oauthProviders.includes(selectedIntegration.type)) {
       return (
-        <div className="mt-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+        <div className="mt-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
           <div className="flex items-start gap-3">
-            <ExternalLink className="w-5 h-5 text-blue-600 mt-0.5" />
+            <ExternalLink className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div>
-              <p className="font-medium text-blue-900">OAuth Connection</p>
-              <p className="text-sm text-blue-700 mt-1">
-                You'll be redirected to {selectedIntegration.name} to authorize the connection securely.
+              <p className="font-medium text-blue-900 dark:text-blue-100">Secure OAuth Connection</p>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                You'll be redirected to {selectedIntegration.name} to authorize the connection securely. 
+                We'll only request the permissions needed.
               </p>
             </div>
           </div>
@@ -292,19 +315,21 @@ const Integrations = () => {
     }
     
     // API key / credentials-based integration
-    if (oauthConfig?.fields?.length) {
+    const credConfig = credentialConfigs[selectedIntegration.type];
+    
+    if (credConfig?.fields?.length) {
       return (
         <div className="mt-6 space-y-4">
-          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5" />
-              <p className="text-sm text-amber-800">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
                 Your credentials are securely encrypted and stored.
               </p>
             </div>
           </div>
           
-          {oauthConfig.fields.map((field) => (
+          {credConfig.fields.map((field) => (
             <div key={field.key} className="space-y-2">
               <Label>{field.label}</Label>
               <Input
