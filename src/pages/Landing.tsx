@@ -442,7 +442,7 @@ const Landing = () => {
               <Button
                 variant="outline"
                 size="lg"
-                className="text-lg px-8 h-14 rounded-xl border-white/20 text-white hover:bg-white/10"
+                className="text-lg px-8 h-14 rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20"
               >
                 <Play className="mr-2 h-5 w-5" />
                 Watch Demo
